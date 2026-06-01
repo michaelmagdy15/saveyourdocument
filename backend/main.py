@@ -146,6 +146,9 @@ class HumanizeRequest(BaseModel):
 
 @app.get("/")
 def read_root():
+    static_index = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "index.html")
+    if os.path.isfile(static_index):
+        return FileResponse(static_index, media_type="text/html")
     return {"status": "healthy", "service": "SAVEYOURDOCUMENT API by Mitrixo Systems"}
 
 # 2. POST /api/upload
