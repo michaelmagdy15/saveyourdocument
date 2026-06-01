@@ -53,7 +53,15 @@ try {
 
 # Step 4: Build and push using Cloud Build
 Write-Host "[4/6] Building Docker image via Cloud Build..." -ForegroundColor Yellow
-gcloud builds submit --config=cloudbuild.yaml --substitutions="_REGION=$Region,_SERVICE_NAME=$ServiceName,_REPO=$ServiceName" .
+$commitSha = "manual"
+try {
+    $commitSha = (git rev-parse --short HEAD 2>$null).Trim()
+    if (-not $commitSha) { $commitSha = "manual" }
+} catch {
+    $commitSha = "manual"
+}
+Write-Host "  Using Commit SHA: $commitSha" -ForegroundColor DarkGray
+gcloud builds submit --config=cloudbuild.yaml --substitutions="_REGION=$Region,_SERVICE_NAME=$ServiceName,_REPO=$ServiceName,_COMMIT_SHA=$commitSha" .
 
 # Step 5: Set Gemini API key if provided
 if ($GeminiApiKey) {
