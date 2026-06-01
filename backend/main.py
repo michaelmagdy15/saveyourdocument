@@ -219,7 +219,7 @@ async def humanize_endpoint(request: HumanizeRequest):
         
     async def sse_event_generator():
         try:
-            logger.info(f"Starting chunk-by-chunk humanization for document: {file_id}")
+            logger.info(f"Starting parallel chunk-by-chunk humanization for document: {file_id}")
             
             # Non-blocking extraction of chunks
             chunks = await asyncio.to_thread(DocxProcessor.extract_chunks, original_path)
@@ -249,102 +249,168 @@ async def humanize_endpoint(request: HumanizeRequest):
                 yield f"data: {json.dumps({'status': 'completed', 'file_id': file_id, 'metrics': empty_metrics, 'message': 'The document contains no editable paragraphs.'})}\n\n"
                 return
                 
-            updated_chunks = {}
-            for idx, chunk in enumerate(chunks):
-                chunk_index = chunk["index"]
-                original_text = chunk["text"]
+            # Create a queue to coordinate SSE events from parallel tasks
+            event_queue = asyncio.Queue()
+            
+            # Create a semaphore to cap concurrent Gemini API requests to 3 to stay within rate limits
+            api_semaphore = asyncio.Semaphore(3)
+            
+            # Completed chunks counter with a lock for thread-safe operations
+            completed_chunks = 0
+            completed_chunks_lock = asyncio.Lock()
+            
+            async def process_chunk_task(chunk_data, chunk_idx):
+                nonlocal completed_chunks
+                c_index = chunk_data["index"]
+                orig_text = chunk_data["text"]
                 
                 # Check for empty paragraph/text cleanly to skip external API calls
-                if not original_text.strip():
-                    logger.info(f"Chunk {idx+1}/{total_chunks} (index {chunk_index}) is empty. Skipping humanization API call.")
-                    updated_chunks[chunk_index] = original_text
+                if not orig_text.strip():
+                    async with completed_chunks_lock:
+                        completed_chunks += 1
+                        progress_pct = int((completed_chunks / total_chunks) * 100)
                     
-                    event_data = {
+                    event = {
                         "status": "processing",
-                        "current_chunk": idx + 1,
+                        "current_chunk": chunk_idx + 1,
                         "total_chunks": total_chunks,
-                        "progress_percentage": int(((idx + 1) / total_chunks) * 100),
-                        "original_text": original_text,
-                        "humanized_text": original_text
+                        "progress_percentage": progress_pct,
+                        "original_text": orig_text,
+                        "humanized_text": orig_text,
+                        "chunk_index": c_index
                     }
-                    yield f"data: {json.dumps(event_data)}\n\n"
-                    await asyncio.sleep(0.01)
-                    continue
+                    await event_queue.put(event)
+                    return c_index, orig_text
                 
-                logger.info(f"Processing chunk {idx+1}/{total_chunks} (index {chunk_index}, length {len(original_text)} chars, word count: {len(original_text.split())})")
-                
-                # Send SSE status for current processing stage
-                stage_data = {
-                    "status": "stage",
-                    "current_chunk": idx + 1,
-                    "total_chunks": total_chunks,
-                    "message": f"Humanizing chunk {idx+1}/{total_chunks} via Gemini API..."
-                }
-                yield f"data: {json.dumps(stage_data)}\n\n"
-                
-                try:
-                    # Run blocking API humanization in a separate thread to prevent event loop freezing
-                    start_time = asyncio.get_event_loop().time()
-                    humanized_text = await asyncio.to_thread(humanize_text, original_text, api_key)
-                    duration = asyncio.get_event_loop().time() - start_time
-                    logger.info(f"Successfully humanized chunk {idx+1}/{total_chunks} (index {chunk_index}) in {duration:.2f}s")
-                    
-                    # Notify client about post-processing stage
-                    post_stage_data = {
+                # Run the actual humanization using the concurrency limiting semaphore
+                async with api_semaphore:
+                    # Notify about starting API processing
+                    await event_queue.put({
                         "status": "stage",
-                        "current_chunk": idx + 1,
+                        "current_chunk": chunk_idx + 1,
                         "total_chunks": total_chunks,
-                        "message": "Applying anti-detection post-processing..."
-                    }
-                    yield f"data: {json.dumps(post_stage_data)}\n\n"
-                except RateLimitError as e:
-                    logger.error(f"Rate limit exceeded during chunk {idx+1} humanization: {e}")
-                    error_data = {
-                        "status": "error",
-                        "message": "Gemini API rate limit exceeded. Please check your quota/API key rate limit, or try again later."
-                    }
-                    yield f"data: {json.dumps(error_data)}\n\n"
-                    return
-                except GeminiAPIError as e:
-                    logger.error(f"Gemini API error during chunk {idx+1} humanization: {e}")
-                    error_data = {
-                        "status": "error",
-                        "message": f"Gemini API Error: {str(e)}"
-                    }
-                    yield f"data: {json.dumps(error_data)}\n\n"
-                    return
-                except HumanizerError as e:
-                    logger.error(f"Humanization connection or timeout error during chunk {idx+1}: {e}")
-                    error_data = {
-                        "status": "error",
-                        "message": f"Connection/Humanization Error: {str(e)}"
-                    }
-                    yield f"data: {json.dumps(error_data)}\n\n"
-                    return
+                        "message": f"Humanizing chunk {chunk_idx+1}/{total_chunks} via Gemini API..."
+                    })
+                    
+                    try:
+                        # Call the blocking humanizer function in a separate thread to keep the event loop responsive
+                        start_time = asyncio.get_event_loop().time()
+                        hum_text = await asyncio.to_thread(humanize_text, orig_text, api_key)
+                        duration = asyncio.get_event_loop().time() - start_time
+                        logger.info(f"Successfully humanized chunk {chunk_idx+1}/{total_chunks} (index {c_index}) in {duration:.2f}s")
+                        
+                        # Notify about entering post-processing
+                        await event_queue.put({
+                            "status": "stage",
+                            "current_chunk": chunk_idx + 1,
+                            "total_chunks": total_chunks,
+                            "message": "Applying anti-detection post-processing..."
+                        })
+                        
+                        async with completed_chunks_lock:
+                            completed_chunks += 1
+                            progress_pct = int((completed_chunks / total_chunks) * 100)
+                            
+                        # Put the successful humanization result on the queue
+                        event = {
+                            "status": "processing",
+                            "current_chunk": chunk_idx + 1,
+                            "total_chunks": total_chunks,
+                            "progress_percentage": progress_pct,
+                            "original_text": orig_text,
+                            "humanized_text": hum_text,
+                            "chunk_index": c_index
+                        }
+                        await event_queue.put(event)
+                        return c_index, hum_text
+                        
+                    except RateLimitError as e:
+                        logger.error(f"Rate limit exceeded during chunk {chunk_idx+1} humanization: {e}")
+                        await event_queue.put({
+                            "status": "error",
+                            "message": "Gemini API rate limit exceeded. Please check your quota/API key rate limit, or try again later."
+                        })
+                        raise
+                    except GeminiAPIError as e:
+                        logger.error(f"Gemini API error during chunk {chunk_idx+1} humanization: {e}")
+                        await event_queue.put({
+                            "status": "error",
+                            "message": f"Gemini API Error: {str(e)}"
+                        })
+                        raise
+                    except HumanizerError as e:
+                        logger.error(f"Humanization connection or timeout error during chunk {chunk_idx+1}: {e}")
+                        await event_queue.put({
+                            "status": "error",
+                            "message": f"Connection/Humanization Error: {str(e)}"
+                        })
+                        raise
+                    except Exception as e:
+                        logger.exception(f"Unexpected error during chunk {chunk_idx+1} humanization: {e}")
+                        await event_queue.put({
+                            "status": "error",
+                            "message": f"An unexpected error occurred: {str(e)}"
+                        })
+                        raise
+            
+            # Spawn processing tasks for all chunks concurrently
+            tasks = [
+                asyncio.create_task(process_chunk_task(c, i))
+                for i, c in enumerate(chunks)
+            ]
+            
+            # Run a monitor task to wait for completion and put a None sentinel in the event queue
+            async def monitor_tasks():
+                try:
+                    await asyncio.gather(*tasks, return_exceptions=True)
                 except Exception as e:
-                    logger.exception(f"Unexpected error during chunk {idx+1} humanization: {e}")
-                    error_data = {
-                        "status": "error",
-                        "message": f"An unexpected error occurred: {str(e)}"
+                    logger.error(f"Monitor caught error: {e}")
+                finally:
+                    await event_queue.put(None)
+                    
+            monitor_job = asyncio.create_task(monitor_tasks())
+            
+            # Read from the event queue and stream to the SSE client in real time
+            updated_chunks = {}
+            has_error = False
+            
+            while True:
+                event = await event_queue.get()
+                if event is None:
+                    break
+                    
+                if event.get("status") == "error":
+                    has_error = True
+                    yield f"data: {json.dumps(event)}\n\n"
+                    # Cancel any outstanding chunk tasks
+                    for t in tasks:
+                        if not t.done():
+                            t.cancel()
+                    break
+                
+                if event.get("status") == "processing":
+                    chunk_index = event["chunk_index"]
+                    humanized_text = event["humanized_text"]
+                    updated_chunks[chunk_index] = humanized_text
+                    
+                    # Yield standard frontend event
+                    frontend_event = {
+                        "status": "processing",
+                        "current_chunk": event["current_chunk"],
+                        "total_chunks": event["total_chunks"],
+                        "progress_percentage": event["progress_percentage"],
+                        "original_text": event["original_text"],
+                        "humanized_text": event["humanized_text"]
                     }
-                    yield f"data: {json.dumps(error_data)}\n\n"
-                    return
-                
-                updated_chunks[chunk_index] = humanized_text
-                
-                progress = int(((idx + 1) / total_chunks) * 100)
-                event_data = {
-                    "status": "processing",
-                    "current_chunk": idx + 1,
-                    "total_chunks": total_chunks,
-                    "progress_percentage": progress,
-                    "original_text": original_text,
-                    "humanized_text": humanized_text
-                }
-                yield f"data: {json.dumps(event_data)}\n\n"
-                
-                # Yield CPU flow to prevent blocking
-                await asyncio.sleep(0.05)
+                    yield f"data: {json.dumps(frontend_event)}\n\n"
+                else:
+                    yield f"data: {json.dumps(event)}\n\n"
+            
+            # Wait for monitor job to clean up fully
+            await monitor_job
+            
+            if has_error:
+                return
                 
             # Reconstruct humanized docx in a separate thread
             humanized_path = os.path.join(TEMP_DIR, f"{file_id}_humanized.docx")

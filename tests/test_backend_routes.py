@@ -194,9 +194,10 @@ class TestBackendRoutes(unittest.TestCase):
                 event_content = line[len("data:"):].strip()
                 events.append(json.loads(event_content))
                 
-        # We expect a single error event representing rate limit
-        self.assertEqual(events[0]["status"], "error")
-        self.assertIn("rate limit exceeded", events[0]["message"].lower())
+        # We expect an error event representing rate limit in the stream
+        error_events = [e for e in events if e["status"] == "error"]
+        self.assertTrue(len(error_events) > 0)
+        self.assertIn("rate limit exceeded", error_events[0]["message"].lower())
 
     def test_humanize_route_empty_document(self):
         # Create an empty docx document (without paragraphs)
