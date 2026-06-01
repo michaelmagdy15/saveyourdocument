@@ -25,7 +25,7 @@ export default function FileUpload({
     }
   }, [error, externalError]);
 
-  // Validate that the file is a Word document
+  // Validate that the file is a Word document and meets Freemium size limits
   const validateFile = (selectedFile) => {
     if (!selectedFile) return false;
     
@@ -34,6 +34,13 @@ export default function FileUpload({
     
     if (fileExtension !== 'docx') {
       setError('Format invalide. Seuls les documents Word (.docx) sont acceptés.');
+      return false;
+    }
+
+    // 10MB Freemium Limit (10 * 1024 * 1024 bytes)
+    const maxFreemiumSize = 10 * 1024 * 1024;
+    if (selectedFile.size > maxFreemiumSize) {
+      setError('Fichier trop volumineux. La limite Freemium est de 10 Mo par document. Veuillez diviser le fichier ou contacter le support pour une limite supérieure.');
       return false;
     }
     

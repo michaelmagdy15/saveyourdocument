@@ -4,6 +4,7 @@ import shutil
 import logging
 import json
 import asyncio
+import time
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -93,6 +94,50 @@ app.add_middleware(
 TEMP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp_uploads")
 os.makedirs(TEMP_DIR, exist_ok=True)
 logger.info(f"Temporary uploads directory initialized at {TEMP_DIR}")
+
+async def cleanup_temp_files_loop():
+    """
+    Background task that periodically cleans up old files in TEMP_DIR.
+    Runs every hour, deleting files older than 1 hour.
+    """
+    logger.info("Temporary files auto-cleanup background service started.")
+    while True:
+        try:
+            now = time.time()
+            # 1 hour = 3600 seconds
+            retention_period = 3600
+            
+            logger.info("Running scheduled cleanup scan in temp_uploads...")
+            count = 0
+            for filename in os.listdir(TEMP_DIR):
+                # Do not delete the .gitkeep file
+                if filename == ".gitkeep":
+                    continue
+                    
+                file_path = os.path.join(TEMP_DIR, filename)
+                if os.path.isfile(file_path):
+                    file_mtime = os.path.getmtime(file_path)
+                    if now - file_mtime > retention_period:
+                        try:
+                            os.remove(file_path)
+                            count += 1
+                            logger.info(f"Cleaned up expired temp file: {filename}")
+                        except Exception as err:
+                            logger.error(f"Failed to delete {filename}: {err}")
+            if count > 0:
+                logger.info(f"Cleanup scan finished. Removed {count} expired files.")
+            else:
+                logger.info("Cleanup scan finished. No expired files found.")
+                
+        except Exception as e:
+            logger.error(f"Error in cleanup_temp_files_loop: {e}")
+            
+        # Wait for 1 hour (3600 seconds) before scanning again
+        await asyncio.sleep(3600)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(cleanup_temp_files_loop())
 
 # Schema for humanization request
 class HumanizeRequest(BaseModel):
