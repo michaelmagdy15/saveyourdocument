@@ -84,7 +84,13 @@ def calculate_paragraph_risks(text: str) -> list:
         })
     return results
 
-async def humanize_text(text: str, api_key: Optional[str] = None, preset: str = "balanced", ngram_shield: bool = True) -> str:
+async def humanize_text(
+    text: str,
+    api_key: Optional[str] = None,
+    preset: str = "balanced",
+    ngram_shield: bool = True,
+    progress_callback = None
+) -> str:
     post_processor = FrenchPostProcessor(ngram_shield=ngram_shield)
     key = api_key or os.environ.get("GEMINI_API_KEY")
     if not key:
@@ -92,7 +98,7 @@ async def humanize_text(text: str, api_key: Optional[str] = None, preset: str = 
         logger.info("Applying FrenchPostProcessor for local post-processing...")
         return post_processor.process(text, ngram_shield=ngram_shield)
 
-    humanizer = FrenchHumanizer(api_key=key, batch_size=2, preset=preset)
+    humanizer = FrenchHumanizer(api_key=key, batch_size=2, preset=preset, progress_callback=progress_callback)
     result = await humanizer.humanize_text(text)
     logger.info("Applying anti-detection post-processing...")
     return post_processor.process(result, ngram_shield=ngram_shield)
@@ -372,9 +378,23 @@ async def humanize_endpoint(request: HumanizeRequest):
                     })
                     
                     try:
+                        async def progress_cb(prog_data):
+                            await event_queue.put({
+                                "status": "stage",
+                                "current_chunk": chunk_idx + 1,
+                                "total_chunks": total_chunks,
+                                "message": f"Chunk {chunk_idx+1} — {prog_data['message']}"
+                            })
+
                         # Call the blocking humanizer function in a separate thread to keep the event loop responsive
                         start_time = asyncio.get_event_loop().time()
-                        hum_text = await humanize_text(orig_text, api_key, preset=request.preset, ngram_shield=request.ngram_shield)
+                        hum_text = await humanize_text(
+                            orig_text, 
+                            api_key, 
+                            preset=request.preset, 
+                            ngram_shield=request.ngram_shield,
+                            progress_callback=progress_cb
+                        )
                         duration = asyncio.get_event_loop().time() - start_time
                         logger.info(f"Successfully humanized chunk {chunk_idx+1}/{total_chunks} (index {c_index}) in {duration:.2f}s")
                         

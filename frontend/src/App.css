@@ -915,6 +915,103 @@
   width: 100%;
 }
 
+/* Terminal Box */
+.terminal-box {
+  background: #020617; /* Very dark slate */
+  border: 1px solid rgba(129, 140, 248, 0.2); /* Sleek indigo border */
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--mono, "Courier New", Courier, monospace);
+  font-size: 11px;
+  color: #38bdf8; /* light blue console text */
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+.terminal-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.terminal-indicator {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10b981; /* pulsing green active dot */
+  margin-right: 8px;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.terminal-indicator.pulsing {
+  animation: logPulse 1.5s infinite;
+}
+
+@keyframes logPulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
+.terminal-content {
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 0.5rem;
+}
+
+.terminal-line {
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  text-align: left;
+}
+
+.terminal-line.stage {
+  color: #a855f7; /* purple */
+}
+
+.terminal-line.success {
+  color: #10b981; /* green */
+}
+
+.terminal-line.info {
+  color: #38bdf8; /* light blue */
+}
+
+.terminal-line.error {
+  color: #ef4444; /* red */
+  font-weight: 600;
+}
+
+/* Custom Scrollbar for terminal content */
+.terminal-content::-webkit-scrollbar {
+  width: 4px;
+}
+.terminal-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.terminal-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.terminal-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 /* Snippet Preview Box */
 .preview-box {
   background: rgba(2, 6, 23, 0.3);

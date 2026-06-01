@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import FileUpload from './components/FileUpload';
 import ProgressBar from './components/ProgressBar';
 import Dashboard from './components/Dashboard';
@@ -53,6 +53,19 @@ export default function App() {
   const [selectedPreset, setSelectedPreset] = useState('balanced');
   const [isNgramShieldEnabled, setIsNgramShieldEnabled] = useState(true);
   const [paragraphRisks, setParagraphRisks] = useState([]);
+  const [terminalLogs, setTerminalLogs] = useState([]);
+  const terminalEndRef = useRef(null);
+
+  useEffect(() => {
+    if (terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [terminalLogs]);
+
+  const appendLog = (message, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    setTerminalLogs((prev) => [...prev, { timestamp, message, type }]);
+  };
 
   // --- COMPATIBILITY CONNECTION CHECK ---
   useEffect(() => {
@@ -158,8 +171,12 @@ export default function App() {
     setProcessingStatus('humanizing');
     setProgress(0);
     setStatusMessage('Starting deep rephrasing and plagiarism extraction...');
+    setTerminalLogs([
+      { timestamp: new Date().toLocaleTimeString(), message: 'Initializing deep rephrasing and plagiarism extraction session...', type: 'info' }
+    ]);
 
     if (connectionMode === 'live') {
+      appendLog('Connecting to SAVEYOURDOCUMENT live server endpoint...', 'info');
       try {
         const response = await fetch(`${API_BASE}/api/humanize`, {
           method: 'POST',
@@ -177,12 +194,14 @@ export default function App() {
           throw new Error(errData.detail || 'Failed to start humanization.');
         }
 
+        appendLog('Handshake established. Reading realtime pipeline event stream...', 'info');
+
         // Read SSE chunk-by-chunk stream using standard ReadableStream
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
         let buffer = '';
 
-        while (true) {
+        outerLoop: while (true) {
           const { value, done } = await reader.read();
           if (done) break;
 
@@ -202,6 +221,9 @@ export default function App() {
                   setStatusMessage(`Processing chunk ${event.current_chunk} of ${event.total_chunks}...`);
                   setOriginalSnippet(event.original_text);
                   setHumanizedSnippet(event.humanized_text);
+                  appendLog(`Processed chunk ${event.current_chunk}/${event.total_chunks} (${event.progress_percentage}%)`, 'success');
+                } else if (event.status === 'stage') {
+                  appendLog(event.message, 'stage');
                 } else if (event.status === 'completed') {
                   setProgress(100);
                   setStatusMessage('Document rephrased and compiled successfully.');
@@ -217,35 +239,50 @@ export default function App() {
                     grade_level: event.metrics.grade_level,
                     vocabulary_richness: event.metrics.vocabulary_richness
                   });
+                  appendLog(event.message || 'Humanization completed successfully. Preparing dashboard...', 'success');
                   setProcessingStatus('completed');
                   setActiveStep(3); // Go to Dashboard Step
                 } else if (event.status === 'error') {
-                  throw new Error(event.message || 'API parsing exception.');
+                  setErrorMessage(event.message || 'API parsing exception.');
+                  setProcessingStatus('error');
+                  appendLog(event.message || 'API parsing exception.', 'error');
+                  await reader.cancel();
+                  break outerLoop;
                 }
               } catch (e) {
                 console.error("Error parsing stream event:", e);
+                appendLog(`Failed to parse stream event: ${e.message}`, 'error');
               }
             }
           }
         }
       } catch (err) {
         setErrorMessage(err.message || 'An error occurred during humanization.');
+        appendLog(`Fatal pipeline error: ${err.message}`, 'error');
         setProcessingStatus('error');
       }
     } else {
       // --- DEMO MODE SSE SIMULATION ---
+      appendLog('Simulating live connection in Demo Mode...', 'info');
       const mockChunks = [
         { orig: "En conclusion, il convient de souligner que l'analyse des résultats démontre de surcroît l'efficacité de cette technologie.", hum: "Pour conclure, l'analyse des résultats met en évidence à quel point cette technologie s'avère particulièrement efficace." },
         { orig: "De plus, il est important de noter que les collaborateurs ont fait preuve d'une adaptation rapide et proactive en effet.", hum: "Par ailleurs, on remarque que l'équipe s'est adaptée avec une rapidité et une réactivité exemplaires." },
-        { orig: "En résumé, il convient de rappeler que la formation continue constitue un facteur clé de réussite absolue.", hum: "En définitive, rappelons que l'apprentissage continu demeure le levier principal de notre réussite." }
+        { orig: "En résumé, il convient de rappeler que la formation continue constitue un factor clé de réussite absolue.", hum: "En définitive, rappelons que l'apprentissage continu demeure le levier principal de notre réussite." }
       ];
 
       let chunkIdx = 0;
+      appendLog('Running mock Multi-Pass humanizer engine...', 'stage');
       const interval = setInterval(() => {
         chunkIdx++;
         const pct = Math.round((chunkIdx / 10) * 100);
         setProgress(pct);
         setStatusMessage(`Processing French chunk ${chunkIdx} of 10 (7,880 words total)...`);
+        appendLog(`Processing French chunk ${chunkIdx}/10 via local model simulation...`, 'success');
+        if (chunkIdx === 3) {
+          appendLog('Applying rhythmic sentence variance injections...', 'stage');
+        } else if (chunkIdx === 6) {
+          appendLog('Running N-gram Plagiarism signature scraper...', 'stage');
+        }
         
         const mockIdx = (chunkIdx - 1) % mockChunks.length;
         setOriginalSnippet(mockChunks[mockIdx].orig);
@@ -255,12 +292,13 @@ export default function App() {
           clearInterval(interval);
           setProgress(100);
           setStatusMessage('Document rephrased and compiled successfully.');
+          appendLog('Demo humanization completed successfully. Rebuilding DOCX structure...', 'success');
           
           setFullOriginalText(`En conclusion, il convient de souligner que l'analyse des résultats démontre de surcroît l'efficacité de cette technologie.
           
 De plus, il est important de noter que les collaborateurs ont fait preuve d'une adaptation rapide et proactive en effet.
 
-En résumé, il convient de rappeler que la formation continue constitue un facteur clé de réussite absolue.`);
+En résumé, il convient de rappeler que la formation continue constitue un factor clé de réussite absolue.`);
           
           setFullHumanizedText(`Pour conclure, l'analyse des résultats met en évidence à quel point cette technologie s'avère particulièrement efficace.
 
@@ -571,6 +609,28 @@ En définitive, rappelons que l'apprentissage continu demeure le levier principa
             {processingStatus === 'error' && errorMessage && (
               <div className="alert-error" role="alert">
                 <strong>Error:</strong> {errorMessage}
+              </div>
+            )}
+
+            {/* Realtime Terminal Console Log */}
+            {terminalLogs.length > 0 && (
+              <div className="terminal-box animate-subtle">
+                <div className="terminal-title">
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className={`terminal-indicator ${processingStatus === 'humanizing' ? 'pulsing' : ''}`}></span>
+                    <span>Pipeline Handshake & Processing Logs</span>
+                  </div>
+                  <span style={{ color: 'var(--accent)', fontSize: '9px', fontWeight: '800' }}>CONSOLE ACTIVE</span>
+                </div>
+                <div className="terminal-content">
+                  {terminalLogs.map((log, idx) => (
+                    <div key={idx} className={`terminal-line ${log.type}`}>
+                      <span style={{ color: '#64748b', marginRight: '8px' }}>[{log.timestamp}]</span>
+                      <span>{log.message}</span>
+                    </div>
+                  ))}
+                  <div ref={terminalEndRef} />
+                </div>
               </div>
             )}
 
