@@ -57,7 +57,7 @@ def calculate_metrics(text: str) -> dict:
         "estimated_reading_time_seconds": res.get("estimated_reading_time_seconds", 0)
     }
 
-def humanize_text(text: str, api_key: Optional[str] = None) -> str:
+async def humanize_text(text: str, api_key: Optional[str] = None) -> str:
     post_processor = FrenchPostProcessor()
     key = api_key or os.environ.get("GEMINI_API_KEY")
     if not key:
@@ -66,7 +66,7 @@ def humanize_text(text: str, api_key: Optional[str] = None) -> str:
         return post_processor.process(text)
 
     humanizer = FrenchHumanizer(api_key=key, batch_size=2)
-    result = humanizer.humanize_text(text)
+    result = await humanizer.humanize_text(text)
     logger.info("Applying anti-detection post-processing...")
     return post_processor.process(result)
 
@@ -343,7 +343,7 @@ async def humanize_endpoint(request: HumanizeRequest):
                     try:
                         # Call the blocking humanizer function in a separate thread to keep the event loop responsive
                         start_time = asyncio.get_event_loop().time()
-                        hum_text = await asyncio.to_thread(humanize_text, orig_text, api_key)
+                        hum_text = await humanize_text(orig_text, api_key)
                         duration = asyncio.get_event_loop().time() - start_time
                         logger.info(f"Successfully humanized chunk {chunk_idx+1}/{total_chunks} (index {c_index}) in {duration:.2f}s")
                         
@@ -467,8 +467,11 @@ async def humanize_endpoint(request: HumanizeRequest):
             
             # Calculate final metrics from humanized file in a separate thread
             import docx
+            o_doc = await asyncio.to_thread(docx.Document, original_path)
             h_doc = await asyncio.to_thread(docx.Document, humanized_path)
-            full_humanized_text = "\n".join([p.text for p in h_doc.paragraphs if p.text.strip()])
+            
+            full_original_text = "\n\n".join([p.text for p in o_doc.paragraphs if p.text.strip()])
+            full_humanized_text = "\n\n".join([p.text for p in h_doc.paragraphs if p.text.strip()])
             
             # CPU-bound metrics calculation run in a separate thread
             after_metrics = await asyncio.to_thread(calculate_metrics, full_humanized_text)
@@ -478,6 +481,8 @@ async def humanize_endpoint(request: HumanizeRequest):
                 "status": "completed",
                 "file_id": file_id,
                 "metrics": after_metrics,
+                "original_text": full_original_text,
+                "humanized_text": full_humanized_text,
                 "message": "Humanization completed successfully."
             }
             logger.info(f"Successfully completed humanizing file: {file_id}")
@@ -492,6 +497,61 @@ async def humanize_endpoint(request: HumanizeRequest):
             yield f"data: {json.dumps(error_data)}\n\n"
             
     return StreamingResponse(sse_event_generator(), media_type="text/event-stream")
+
+# Schema for document update request
+class UpdateDocumentRequest(BaseModel):
+    humanized_text: str
+
+@app.post("/api/update/{file_id}")
+async def update_document(file_id: str, request: UpdateDocumentRequest):
+    logger.info(f"Update document request received for: {file_id}")
+    original_path = os.path.join(TEMP_DIR, f"{file_id}_original.docx")
+    humanized_path = os.path.join(TEMP_DIR, f"{file_id}_humanized.docx")
+    
+    if not os.path.exists(original_path):
+        logger.warning(f"Update rejected. Original document file not found: {file_id}")
+        raise HTTPException(status_code=404, detail="Original document file not found.")
+        
+    try:
+        # Import DocxProcessor inside the endpoint if not globally imported
+        try:
+            from backend.docx_processor import DocxProcessor
+        except ImportError:
+            from docx_processor import DocxProcessor
+            
+        processor = DocxProcessor()
+        await asyncio.to_thread(processor.load, original_path)
+        
+        # Split user's text into paragraphs
+        new_paragraphs = [p.strip() for p in request.humanized_text.split("\n\n")]
+        new_paragraphs = [p for p in new_paragraphs if p]
+        
+        # Find original non-empty paragraph indices
+        non_empty_indices = []
+        for idx, p in enumerate(processor.paragraphs):
+            if p.text.strip():
+                non_empty_indices.append(idx)
+                
+        # Perform replacements preserving formatting in-place
+        for idx, orig_idx in enumerate(non_empty_indices):
+            if idx < len(new_paragraphs):
+                await asyncio.to_thread(processor.replace_paragraph_text, orig_idx, new_paragraphs[idx])
+                
+        # Save updated document
+        await asyncio.to_thread(processor.save, humanized_path)
+        
+        # Recalculate metrics for updated document
+        full_text = "\n\n".join(new_paragraphs)
+        updated_metrics = await asyncio.to_thread(calculate_metrics, full_text)
+        
+        logger.info(f"Successfully updated and saved document: {file_id}")
+        return {
+            "status": "success",
+            "metrics": updated_metrics
+        }
+    except Exception as e:
+        logger.exception(f"Failed to update document {file_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to apply user edits to document: {str(e)}")
 
 # 4. GET /api/download/{file_id}
 @app.get("/api/download/{file_id}")

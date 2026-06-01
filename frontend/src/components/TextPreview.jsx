@@ -8,6 +8,9 @@ import {
   FileText,
   Sparkles,
   AlertCircle,
+  Save,
+  Loader2,
+  Undo2,
 } from 'lucide-react';
 import './TextPreview.css';
 
@@ -69,33 +72,70 @@ function diffWords(originalStr, humanizedStr) {
   return result.reverse();
 }
 
-export default function TextPreview({ originalText = MOCK_ORIGINAL, humanizedText = MOCK_HUMANIZED }) {
+export default function TextPreview({ 
+  originalText = MOCK_ORIGINAL, 
+  humanizedText = MOCK_HUMANIZED,
+  onSaveEdits = null,
+  isSaving = false
+}) {
   const [viewMode, setViewMode] = useState('split'); // 'split' | 'unified' | 'clean'
   const [copied, setCopied] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
-  // Split paragraphs and trim whitespace
+  // Editable paragraphs state
+  const [editedParagraphs, setEditedParagraphs] = useState([]);
+  const [editingIndex, setEditingIndex] = useState(-1);
+
+  // Synchronize internal state with incoming humanized text prop
+  useEffect(() => {
+    if (humanizedText) {
+      setEditedParagraphs(humanizedText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean));
+    } else {
+      setEditedParagraphs([]);
+    }
+  }, [humanizedText]);
+
+  // Split original paragraphs
   const originalParagraphs = originalText ? originalText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean) : [];
-  const humanizedParagraphs = humanizedText ? humanizedText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean) : [];
-
-  const maxParagraphs = Math.max(originalParagraphs.length, humanizedParagraphs.length);
+  const maxParagraphs = Math.max(originalParagraphs.length, editedParagraphs.length);
 
   // Copy to Clipboard trigger
   const handleCopy = () => {
-    navigator.clipboard.writeText(humanizedText);
+    navigator.clipboard.writeText(editedParagraphs.join("\n\n"));
     setCopied(true);
+    setToastMessage('Humanized text copied to clipboard successfully!');
     setShowToast(true);
   };
 
+  // Revert all edits back to original generated humanized text
+  const handleRevert = () => {
+    if (window.confirm("Are you sure you want to discard all your manual edits and revert to the original humanized version?")) {
+      setEditedParagraphs(humanizedText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean));
+      setEditingIndex(-1);
+      setToastMessage('Reverted to original humanized text.');
+      setShowToast(true);
+    }
+  };
+
+  // Save manual edits to backend
+  const handleSave = async () => {
+    if (onSaveEdits) {
+      await onSaveEdits(editedParagraphs.join("\n\n"));
+      setToastMessage('Edits applied and recompiled into Word document successfully!');
+      setShowToast(true);
+    }
+  };
+
   useEffect(() => {
-    if (copied) {
+    if (showToast) {
       const timer = setTimeout(() => {
         setCopied(false);
         setShowToast(false);
-      }, 2000);
+      }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [copied]);
+  }, [showToast]);
 
   // Renders highlighted text segments for columns
   const renderColumnText = (diff, mode) => {
@@ -159,6 +199,9 @@ export default function TextPreview({ originalText = MOCK_ORIGINAL, humanizedTex
     });
   };
 
+  // Detect whether user edits are different from original humanized text
+  const isModified = editedParagraphs.join("\n\n") !== humanizedText;
+
   return (
     <div className="diff-viewer-container">
       {/* Dashboard & Preview Toolbar */}
@@ -166,9 +209,9 @@ export default function TextPreview({ originalText = MOCK_ORIGINAL, humanizedTex
         <div className="diff-viewer-title">
           <h3>
             <FileText size={18} style={{ color: 'var(--purple-accent)' }} />
-            Compare Writing Transformations
+            Compare & Live Edit Transformations
           </h3>
-          <p>Examine stylistic polishing, structural flow corrections, and vocabulary shifts</p>
+          <p>Double-click any paragraph in the Optimized Human column or Clean view to edit in-place</p>
         </div>
 
         <div className="diff-controls">
@@ -177,7 +220,7 @@ export default function TextPreview({ originalText = MOCK_ORIGINAL, humanizedTex
             <button
               className={`diff-view-btn ${viewMode === 'split' ? 'active' : ''}`}
               onClick={() => setViewMode('split')}
-              title="Compare side-by-side paragraphs"
+              title="Compare side-by-side paragraphs and edit"
             >
               <Columns size={14} />
               Split Columns
@@ -193,18 +236,39 @@ export default function TextPreview({ originalText = MOCK_ORIGINAL, humanizedTex
             <button
               className={`diff-view-btn ${viewMode === 'clean' ? 'active' : ''}`}
               onClick={() => setViewMode('clean')}
-              title="Show clean final output"
+              title="Show clean final output and edit"
             >
               <Eye size={14} />
               Clean Text
             </button>
           </div>
 
-          {/* Copy Button */}
-          <button className="diff-copy-btn" onClick={handleCopy}>
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            <span>{copied ? 'Copied!' : 'Copy Clean'}</span>
-          </button>
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {isModified && (
+              <button className="diff-view-btn" onClick={handleRevert} title="Discard edits">
+                <Undo2 size={14} />
+                <span>Revert</span>
+              </button>
+            )}
+
+            {onSaveEdits && isModified && (
+              <button 
+                className="diff-save-btn" 
+                onClick={handleSave} 
+                disabled={isSaving}
+                title="Save manual edits and rebuild Word document"
+              >
+                {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                <span>{isSaving ? 'Saving...' : 'Apply Edits'}</span>
+              </button>
+            )}
+
+            <button className="diff-copy-btn" onClick={handleCopy}>
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              <span>{copied ? 'Copied!' : 'Copy Clean'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -223,14 +287,14 @@ export default function TextPreview({ originalText = MOCK_ORIGINAL, humanizedTex
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <span className="diff-col-badge humanized">
                   <Sparkles size={13} />
-                  Optimized Human Text
+                  Optimized Human Text (Editable)
                 </span>
               </div>
             </div>
 
             {Array.from({ length: maxParagraphs }).map((_, idx) => {
               const origPara = originalParagraphs[idx] || '';
-              const humanPara = humanizedParagraphs[idx] || '';
+              const humanPara = editedParagraphs[idx] || '';
               const paragraphDiff = diffWords(origPara, humanPara);
 
               return (
@@ -252,21 +316,57 @@ export default function TextPreview({ originalText = MOCK_ORIGINAL, humanizedTex
                     </p>
                   </div>
 
-                  {/* Humanized text block with insertions */}
+                  {/* Humanized text block - double click to edit */}
                   <div className="diff-column humanized">
                     <span className="diff-col-badge humanized">
                       <Sparkles size={13} />
                       Optimized Human Text
                     </span>
-                    <p>
-                      {humanPara ? (
-                        renderColumnText(paragraphDiff, 'humanized')
-                      ) : (
-                        <span className="text-xs italic" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
-                          (No humanized paragraph at this index)
-                        </span>
-                      )}
-                    </p>
+                    
+                    {editingIndex === idx ? (
+                      <div className="paragraph-edit-box">
+                        <textarea
+                          value={humanPara}
+                          onChange={(e) => {
+                            const updated = [...editedParagraphs];
+                            updated[idx] = e.target.value;
+                            setEditedParagraphs(updated);
+                          }}
+                          onBlur={() => setEditingIndex(-1)}
+                          onKeyDown={(e) => {
+                            // Finish editing on Ctrl+Enter or Esc
+                            if ((e.key === 'Enter' && e.ctrlKey) || e.key === 'Escape') {
+                              setEditingIndex(-1);
+                            }
+                          }}
+                          autoFocus
+                          className="premium-paragraph-textarea"
+                          placeholder="Type paragraph text here..."
+                        />
+                        <div className="paragraph-edit-actions">
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            Press <kbd style={{ background: '#1e293b', padding: '1px 4px', borderRadius: '3px' }}>Ctrl + Enter</kbd> or click outside to finish editing
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        onDoubleClick={() => setEditingIndex(idx)} 
+                        title="Double-click to edit this paragraph in-place"
+                        className="editable-paragraph-preview"
+                      >
+                        <p>
+                          {humanPara ? (
+                            renderColumnText(paragraphDiff, 'humanized')
+                          ) : (
+                            <span className="text-xs italic" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
+                              (Paragraph is empty. Double-click to type.)
+                            </span>
+                          )}
+                        </p>
+                        <span className="edit-indicator-icon">✎</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -277,9 +377,15 @@ export default function TextPreview({ originalText = MOCK_ORIGINAL, humanizedTex
         {/* CASE 2: Unified Inline Diff (GitHub Style) */}
         {viewMode === 'unified' && (
           <div className="unified-diff-container">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.25rem 0.5rem 0.75rem', borderBottom: '1px dashed var(--border-glass)', marginBottom: '0.5rem' }}>
+              <AlertCircle size={14} style={{ color: 'var(--purple-accent)' }} />
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                Inline Diff mode displays character comparison. To manually edit paragraphs, please switch to <strong>Split Columns</strong> or <strong>Clean Text</strong>.
+              </span>
+            </div>
             {Array.from({ length: maxParagraphs }).map((_, idx) => {
               const origPara = originalParagraphs[idx] || '';
-              const humanPara = humanizedParagraphs[idx] || '';
+              const humanPara = editedParagraphs[idx] || '';
               const paragraphDiff = diffWords(origPara, humanPara);
 
               return (
@@ -291,26 +397,58 @@ export default function TextPreview({ originalText = MOCK_ORIGINAL, humanizedTex
           </div>
         )}
 
-        {/* CASE 3: Clean Read Mode */}
+        {/* CASE 3: Clean Read Mode (Editable) */}
         {viewMode === 'clean' && (
           <div className="clean-view-container">
-            {humanizedParagraphs.map((para, idx) => (
+            {editedParagraphs.map((para, idx) => (
               <div key={idx} className="clean-paragraph">
-                <p>{para}</p>
+                {editingIndex === idx ? (
+                  <div className="paragraph-edit-box">
+                    <textarea
+                      value={para}
+                      onChange={(e) => {
+                        const updated = [...editedParagraphs];
+                        updated[idx] = e.target.value;
+                        setEditedParagraphs(updated);
+                      }}
+                      onBlur={() => setEditingIndex(-1)}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' && e.ctrlKey) || e.key === 'Escape') {
+                          setEditingIndex(-1);
+                        }
+                      }}
+                      autoFocus
+                      className="premium-paragraph-textarea"
+                    />
+                    <div className="paragraph-edit-actions">
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        Press <kbd style={{ background: '#1e293b', padding: '1px 4px', borderRadius: '3px' }}>Ctrl + Enter</kbd> or click outside to finish editing
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div 
+                    onDoubleClick={() => setEditingIndex(idx)} 
+                    title="Double-click to edit this paragraph in-place"
+                    className="editable-paragraph-preview"
+                  >
+                    <p>{para}</p>
+                    <span className="edit-indicator-icon">✎</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Copied Notification Toast */}
+      {/* Toast Notification */}
       {showToast && (
         <div className="copy-toast">
           <Sparkles size={16} />
-          <span>Humanized text copied to clipboard successfully!</span>
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>
   );
 }
-

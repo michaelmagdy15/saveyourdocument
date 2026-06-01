@@ -152,8 +152,9 @@ class DocxProcessor:
         """
         Replaces the text of the paragraph at the specified index in-place.
         To perfectly preserve formatting, styles, bullet points, numbers, drawings, and images,
-        it clears text nodes from all runs in the paragraph except the first run, and sets
-        the first run's text to the new rephrased content.
+        it distributes the new rephrased words proportionally across existing runs that
+        originally contained text. This ensures mixed inline styling (bold, italic, links)
+        is aligned and preserved in their relative sentence positions.
         
         Args:
             index: The index of the paragraph to replace.
@@ -168,12 +169,64 @@ class DocxProcessor:
         if not runs:
             # If there are no runs, add one
             paragraph.add_run(new_text)
-        else:
-            # Set the first run's text safely
+            return
+
+        # Filter runs that actually contain text to avoid dividing words to empty runs
+        non_empty_runs = [r for r in runs if r.text and r.text.strip()]
+        if not non_empty_runs:
+            # If all runs are empty of text, set first run and clear others
             self._set_run_text_safe(runs[0], new_text)
-            # Clear text of all subsequent runs safely to preserve run properties/images
             for run in runs[1:]:
                 self._clear_run_text(run)
+            return
+
+        new_words = new_text.split()
+        if not new_words:
+            # If new text is empty, clear all text runs
+            for run in runs:
+                self._clear_run_text(run)
+            return
+
+        # Calculate character lengths for non-empty runs
+        run_lengths = [len(r.text) for r in non_empty_runs]
+        total_len = sum(run_lengths)
+        
+        # Distribute words proportionally based on run character lengths
+        word_segments = []
+        cum_ratio = 0.0
+        start_word_idx = 0
+        
+        for idx, run_len in enumerate(run_lengths):
+            cum_ratio += run_len / total_len
+            if idx == len(run_lengths) - 1:
+                end_word_idx = len(new_words)
+            else:
+                end_word_idx = int(round(cum_ratio * len(new_words)))
+                # Ensure we assign at least one word if there are remaining words
+                if end_word_idx <= start_word_idx and start_word_idx < len(new_words):
+                    end_word_idx = start_word_idx + 1
+            
+            segment_words = new_words[start_word_idx:end_word_idx]
+            word_segments.append(" ".join(segment_words))
+            start_word_idx = end_word_idx
+
+        # Write distributed segments to non-empty runs, and clear all other runs
+        non_empty_idx = 0
+        for r in runs:
+            if r in non_empty_runs:
+                seg_text = word_segments[non_empty_idx]
+                
+                # Maintain trailing space or leading space if original run had it
+                orig = r.text
+                if orig.startswith(" ") and not seg_text.startswith(" "):
+                    seg_text = " " + seg_text
+                if orig.endswith(" ") and not seg_text.endswith(" "):
+                    seg_text = seg_text + " "
+                
+                self._set_run_text_safe(r, seg_text)
+                non_empty_idx += 1
+            else:
+                self._clear_run_text(r)
 
     def _set_run_text_safe(self, run, text: str):
         """

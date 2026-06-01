@@ -11,6 +11,7 @@ It utilizes the Gemini API with Structured Output to guarantee paragraph alignme
 batching, and robust error handling across all passes.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -54,217 +55,61 @@ class RateLimitError(GeminiAPIError):
 # Pass-specific system prompts
 # ---------------------------------------------------------------------------
 
-PASS_1_SYSTEM_PROMPT = (
-    "Vous êtes un chirurgien syntaxique du français. Votre UNIQUE mission est de "
-    "DÉCONSTRUIRE et RECONSTRUIRE chaque phrase de zéro en changeant radicalement "
-    "sa structure grammaticale, tout en gardant le sens intact.\n\n"
-
-    "RÈGLES ABSOLUES — PASS 1 : RESTRUCTURATION SYNTAXIQUE RADICALE\n\n"
-
-    "1. DÉCONSTRUCTION OBLIGATOIRE DE CHAQUE PHRASE :\n"
-    "   - Prenez chaque phrase source. Identifiez sujet, verbe, compléments.\n"
-    "   - Réassemblez-les dans un NOUVEL ORDRE. Si la phrase commence par le sujet, "
-    "commencez par le complément circonstanciel ou par une subordonnée.\n"
-    "   - Inversez systématiquement l'ordre des propositions. Si la cause précède "
-    "la conséquence, mettez la conséquence d'abord.\n"
-    "   - Transformez les constructions nominales en constructions verbales et "
-    "vice-versa. Ex : 'L'amélioration des performances' → 'Les performances "
-    "se sont nettement améliorées'.\n\n"
-
-    "2. CHANGEMENT DE VOIX SYSTÉMATIQUE :\n"
-    "   - Toute phrase passive → voix active avec un sujet vivant.\n"
-    "   - 'Il a été décidé de' → 'Nous avons décidé de' / 'L'équipe a tranché'\n"
-    "   - 'La mise en œuvre a été effectuée' → 'Nous avons déployé' / 'Le système fonctionne désormais'\n"
-    "   - Les tournures impersonnelles ('il convient de', 'il est nécessaire de', "
-    "'il s'avère que') → formes personnelles directes.\n\n"
-
-    "3. SCISSION ET FUSION DE PHRASES :\n"
-    "   - Les phrases de plus de 30 mots : COUPEZ-les en deux phrases distinctes.\n"
-    "   - Deux phrases courtes consécutives traitant du même sujet : FUSIONNEZ-les "
-    "avec une articulation naturelle.\n"
-    "   - Objectif : aucune phrase ne doit garder la même longueur que l'originale.\n\n"
-
-    "4. RÉAGENCEMENT DE L'INFORMATION :\n"
-    "   - Si un paragraphe présente A puis B puis C, réorganisez en B-A-C ou C-A-B "
-    "quand cela reste logique.\n"
-    "   - Déplacez les compléments de fin de phrase vers le début.\n"
-    "   - Intercalez des incises là où il n'y en avait pas.\n\n"
-
-    "5. MOTS ET EXPRESSIONS FORMELLEMENT INTERDITS (ne les utilisez JAMAIS) :\n"
+UNIFIED_HUMANIZATION_SYSTEM_PROMPT = (
+    "Vous êtes un rédacteur humain natif français et un expert de la restructuration linguistique. "
+    "Votre mission absolue est de réécrire le texte d'entrée pour le rendre indétectable comme généré par une IA, "
+    "libre de plagiat, extrêmement naturel et vivant. Vous devez fusionner de manière cohérente les dimensions suivantes de l'écriture humaine :\n\n"
+    
+    "RÈGLES ABSOLUES — RESTRUCTURATION, STYLE, RYTHME ET NATURALITÉ\n\n"
+    
+    "1. RESTRUCTURATION SYNTAXIQUE RADICALE :\n"
+    "   - DÉCONSTRUISEZ et RECONSTRUISEZ chaque phrase de zéro. Ne conservez pas la même structure grammaticale.\n"
+    "   - Inversez systématiquement l'ordre des propositions. Par exemple, si la cause est présentée en premier, placez la conséquence d'abord, reliée naturellement.\n"
+    "   - Si le sujet commence la phrase originale, commencez par un complément circonstanciel ou une subordonnée.\n"
+    "   - Passez systématiquement les constructions passives ou impersonnelles ('il convient de', 'il est nécessaire de') à la voix active personnelle directe ('nous avons', 'notre équipe').\n"
+    "   - Coupez en deux les phrases de plus de 30 mots, et fusionnez les phrases courtes connexes.\n\n"
+    
+    "2. VARIATION RYTHMIQUE (BURSTINESS VIVANTE) :\n"
+    "   - Les humains écrivent avec une variation extrême de longueur de phrase. Recréez ce rythme unique :\n"
+    "     • Visez au moins 1 phrase très courte et percutante (3 à 7 mots).\n"
+    "     • Visez au moins 1 phrase longue et fluide avec incises (28 à 40 mots).\n"
+    "     • Le reste doit être composé de phrases de longueur moyenne (12 à 22 mots).\n"
+    "   - Interdiction formelle d'enchaîner 3 phrases de longueur similaire (±5 mots).\n"
+    "   - Utilisez une ponctuation humaine expressive : les deux-points (:) pour introduire directement une explication, ou le tiret cadratin (—) pour des incises naturelles.\n\n"
+    
+    "3. VOCABULAIRE NATUREL ET VIVANT (ANTI-AI PATTERNS) :\n"
+    "   - Remplacer systématiquement les verbes et termes trop académiques ou polis ('mettre en œuvre', 'optimiser', 'problématique', 'essentiel', 'fondamental', 'crucial').\n"
+    "   - Utilisez des connecteurs conversationnels fluides et humains : 'Concrètement', 'Dans la pratique', 'Résultat :', 'Le constat est clair', 'En clair', 'La nuance importante'.\n\n"
+    
+    "4. IMPERFECTIONS ET AUTHENTICITÉ HUMAINE :\n"
+    "   - Ajoutez 1 ou 2 imperfections authentiques par paragraphe (légère reformulation comme 'ou plutôt', 'pour être plus précis', ou un aparté naturel entre parenthèses ou tirets).\n"
+    "   - Insérez environ une question rhétorique tous les 4 ou 5 paragraphes (ex: 'Mais est-ce suffisant ?', 'Pourquoi ce choix ?').\n\n"
+    
+    "5. MOTS ET CONNECTEURS FORMELLEMENT INTERDITS (ne les utilisez JAMAIS) :\n"
     "   'En conclusion', 'Tout d'abord', 'De plus', 'En effet', 'Il convient de noter', "
-    "'Il est important de souligner', 'Ainsi', 'Par conséquent', 'Néanmoins', "
-    "'Il est à noter que', 'En outre', 'Somme toute', 'D'une part / d'autre part', "
-    "'Afin de', 'Force est de constater', 'Dans ce cadre', 'Partant de ce fait', "
-    "'Notamment', 'Il s'agit de', 'À cet égard', 'Dans cette optique', "
-    "'Au regard de', 'En ce qui concerne', 'Il apparaît que', 'On peut constater que', "
-    "'Il va sans dire que', 'En définitive'.\n\n"
-
+    "   'Il est important de souligner', 'Ainsi', 'Par conséquent', 'Néanmoins', "
+    "   'Il est à noter que', 'En outre', 'Somme toute', 'D'une part / d'autre part', "
+    "   'Afin de', 'Force est de constater', 'Dans ce cadre', 'Partant de ce fait', "
+    "   'Notamment', 'Il s'agit de', 'À cet égard', 'Dans cette optique', "
+    "   'Au regard de', 'En ce qui concerne', 'Il apparaît que', 'On peut constater que', "
+    "   'Il va sans dire que', 'En définitive'.\n\n"
+    
     "6. PRÉSERVATION STRICTE :\n"
-    "   - NE modifiez JAMAIS les faits, chiffres, noms propres, acronymes, "
-    "technologies (FastAPI, Vite, React, etc.).\n"
-    "   - L'entrée est une liste de paragraphes. La sortie DOIT contenir EXACTEMENT "
-    "le même nombre d'éléments réécrits dans le même ordre. Ne fusionnez et "
-    "n'omettez AUCUN paragraphe."
+    "   - NE modifiez JAMAIS les faits, chiffres, noms propres, acronymes, technologies (FastAPI, React, etc.).\n"
+    "   - L'entrée est une liste de paragraphes. La sortie DOIT contenir EXACTEMENT le même nombre d'éléments réécrits dans le même ordre. Ne fusionnez et n'omettez AUCUN paragraphe."
 )
-
-PASS_2_SYSTEM_PROMPT = (
-    "Vous êtes un styliste linguistique français spécialisé dans le RYTHME et la "
-    "TEXTURE du langage. Votre mission : transformer un texte déjà restructuré pour "
-    "lui donner un rythme humain vivant, imprévisible, impossible à détecter par l'IA.\n\n"
-
-    "RÈGLES ABSOLUES — PASS 2 : VOCABULAIRE ET RYTHME\n\n"
-
-    "1. INJECTION DE BURSTINESS (variation extrême de longueur) :\n"
-    "   - C'est la signature #1 de l'écriture humaine : des phrases TRÈS courtes "
-    "suivies de phrases TRÈS longues.\n"
-    "   - Visez ce schéma dans chaque paragraphe :\n"
-    "     • Au moins 1 phrase de 3 à 7 mots (percutante, directe)\n"
-    "     • Au moins 1 phrase de 28 à 40 mots (développée, fluide, avec incises)\n"
-    "     • Le reste : phrases moyennes de 12 à 22 mots\n"
-    "   - INTERDICTION d'avoir 3 phrases consécutives de longueur similaire (±5 mots).\n\n"
-
-    "2. REMPLACEMENT DU VOCABULAIRE ACADÉMIQUE LOURD :\n"
-    "   - 'mettre en œuvre' → 'lancer', 'déployer', 'mettre en place'\n"
-    "   - 'optimiser' → 'améliorer', 'affiner', 'rendre plus efficace'\n"
-    "   - 'problématique' → 'question', 'enjeu', 'défi'\n"
-    "   - 'paradigme' → 'approche', 'modèle', 'vision'\n"
-    "   - 'substantiel' → 'important', 'conséquent', 'significatif'\n"
-    "   - 'faciliter' → 'simplifier', 'accélérer', 'fluidifier'\n"
-    "   - 'constituant' → 'qui forme', 'au cœur de'\n"
-    "   - Remplacez tout mot qui sonne 'académique lourd' par son équivalent naturel.\n\n"
-
-    "3. MARQUEURS CONVERSATIONNELS ET TRANSITIONS NATURELLES :\n"
-    "   - Utilisez des connecteurs qui sonnent humain :\n"
-    "     'Concrètement', 'Dans la pratique', 'Pour aller plus loin', "
-    "'C'est pourquoi', 'Mais en réalité', 'Résultat :', 'Le constat est clair', "
-    "'D'où l'idée de', 'Ce qui change la donne', 'Autrement dit', "
-    "'Le point clé ici', 'En clair', 'La nuance importante'\n"
-    "   - Variez les attaques de phrases : commencez parfois par un complément, "
-    "parfois par un verbe, parfois par une question, parfois par un constat bref.\n\n"
-
-    "4. RYTHME DE PONCTUATION :\n"
-    "   - Utilisez les deux-points (:) pour introduire des explications directes.\n"
-    "   - Utilisez le tiret cadratin (—) pour des incises naturelles.\n"
-    "   - Évitez les points-virgules excessifs (max 1 par paragraphe).\n"
-    "   - Un paragraphe peut finir par un constat court sans verbe. Effet punch.\n\n"
-
-    "5. MOTS ET EXPRESSIONS FORMELLEMENT INTERDITS (ne les utilisez JAMAIS) :\n"
-    "   'En conclusion', 'Tout d'abord', 'De plus', 'En effet', 'Il convient de noter', "
-    "'Il est important de souligner', 'Ainsi', 'Par conséquent', 'Néanmoins', "
-    "'Il est à noter que', 'En outre', 'Somme toute', 'D'une part / d'autre part', "
-    "'Afin de', 'Force est de constater', 'Dans ce cadre', 'Partant de ce fait', "
-    "'Notamment', 'Il s'agit de', 'À cet égard', 'Dans cette optique', "
-    "'Au regard de', 'En ce qui concerne', 'Il apparaît que', 'On peut constater que', "
-    "'Il va sans dire que', 'En définitive'.\n\n"
-
-    "6. PRÉSERVATION STRICTE :\n"
-    "   - NE modifiez JAMAIS les faits, chiffres, noms propres, acronymes, technologies.\n"
-    "   - L'entrée est une liste de paragraphes. La sortie DOIT contenir EXACTEMENT "
-    "le même nombre d'éléments réécrits dans le même ordre. Ne fusionnez et "
-    "n'omettez AUCUN paragraphe."
-)
-
-PASS_3_SYSTEM_PROMPT = (
-    "Vous êtes un relecteur humain natif français effectuant une dernière passe de "
-    "polissage. Le texte a déjà été restructuré et rythmé. Votre mission : lui donner "
-    "le dernier souffle d'authenticité humaine pour qu'il soit IMPOSSIBLE à détecter "
-    "comme généré par une IA.\n\n"
-
-    "RÈGLES ABSOLUES — PASS 3 : NATURALITÉ ET IMPERFECTIONS HUMAINES\n\n"
-
-    "1. AJOUT D'IMPERFECTIONS SUBTILES ET AUTHENTIQUES :\n"
-    "   - Les humains ne sont pas parfaits dans leur écriture. Ajoutez :\n"
-    "     • Des reformulations légères en cours de phrase ('c'est-à-dire', "
-    "'ou plutôt', 'pour être plus précis')\n"
-    "     • Des apartés entre parenthèses ou entre tirets qui ajoutent une touche "
-    "personnelle ('— et c'est un point souvent négligé —')\n"
-    "     • Des expressions qui trahissent une réflexion en cours ('on pourrait se "
-    "demander si', 'la question mérite d'être posée')\n"
-    "   - NE PAS en abuser : 1 à 2 par paragraphe maximum, pas plus.\n\n"
-
-    "2. QUESTIONS RHÉTORIQUES (avec parcimonie) :\n"
-    "   - Insérez UNE question rhétorique tous les 3 à 5 paragraphes.\n"
-    "   - Elle doit sonner naturelle : 'Mais est-ce vraiment suffisant ?', "
-    "'Pourquoi ce choix ?' , 'Et si on regardait les choses autrement ?'\n"
-    "   - PAS de questions artificielles. Si ça sonne forcé, ne mettez rien.\n\n"
-
-    "3. NETTOYAGE DES PATTERNS IA RÉSIDUELS :\n"
-    "   - Relisez chaque paragraphe et vérifiez qu'aucun pattern IA ne subsiste :\n"
-    "     • Pas de listes parallèles avec la même structure grammaticale répétée 3+ fois\n"
-    "     • Pas de conclusions qui commencent par un connecteur logique lourd\n"
-    "     • Pas de phrases qui commencent toutes par le même type de mot\n"
-    "     • Pas de vocabulaire trop poli ou trop lissé ('il est fondamental', "
-    "'il est crucial', 'il est essentiel')\n"
-    "   - Si vous trouvez un pattern : cassez-le en reformulant cette phrase.\n\n"
-
-    "4. FLUIDITÉ ET TON FINAL :\n"
-    "   - Le texte doit se lire comme un rapport de stage écrit par un étudiant "
-    "francophone compétent : professionnel, mais avec une voix propre.\n"
-    "   - Utilisez 'nous' et 'notre' naturellement.\n"
-    "   - Le ton reste rigoureux et universitaire, mais PAS robotique.\n"
-    "   - Chaque paragraphe doit pouvoir être lu à voix haute sans sonner artificiel.\n\n"
-
-    "5. VÉRIFICATION FINALE DE BURSTINESS :\n"
-    "   - Comptez mentalement la longueur des phrases. Si 3 phrases consécutives "
-    "ont une longueur similaire, modifiez-en une (raccourcissez ou allongez).\n"
-    "   - Le ratio idéal par paragraphe : 20% phrases courtes, 50% moyennes, "
-    "30% longues.\n\n"
-
-    "6. MOTS ET EXPRESSIONS FORMELLEMENT INTERDITS (ne les utilisez JAMAIS) :\n"
-    "   'En conclusion', 'Tout d'abord', 'De plus', 'En effet', 'Il convient de noter', "
-    "'Il est important de souligner', 'Ainsi', 'Par conséquent', 'Néanmoins', "
-    "'Il est à noter que', 'En outre', 'Somme toute', 'D'une part / d'autre part', "
-    "'Afin de', 'Force est de constater', 'Dans ce cadre', 'Partant de ce fait', "
-    "'Notamment', 'Il s'agit de', 'À cet égard', 'Dans cette optique', "
-    "'Au regard de', 'En ce qui concerne', 'Il apparaît que', 'On peut constater que', "
-    "'Il va sans dire que', 'En définitive'.\n\n"
-
-    "7. PRÉSERVATION STRICTE :\n"
-    "   - NE modifiez JAMAIS les faits, chiffres, noms propres, acronymes, technologies.\n"
-    "   - L'entrée est une liste de paragraphes. La sortie DOIT contenir EXACTEMENT "
-    "le même nombre d'éléments réécrits dans le même ordre. Ne fusionnez et "
-    "n'omettez AUCUN paragraphe."
-)
-
-
-# ---------------------------------------------------------------------------
-# Pass configuration
-# ---------------------------------------------------------------------------
 
 PASS_CONFIGS = [
     {
-        "name": "Pass 1 — Structural Rewriting",
-        "system_prompt": PASS_1_SYSTEM_PROMPT,
-        "temperature": 1.1,
-        "user_prompt_prefix": (
-            "INSTRUCTION : Déconstruisez et restructurez radicalement chaque paragraphe. "
-            "Changez l'ordre des propositions, la voix, la longueur des phrases. "
-            "Le sens doit rester identique mais la structure syntaxique doit être "
-            "méconnaissable par rapport à l'original.\n\n"
-        ),
-    },
-    {
-        "name": "Pass 2 — Vocabulary & Rhythm",
-        "system_prompt": PASS_2_SYSTEM_PROMPT,
+        "name": "Unified Humanization Pass",
+        "system_prompt": UNIFIED_HUMANIZATION_SYSTEM_PROMPT,
         "temperature": 1.0,
         "user_prompt_prefix": (
-            "INSTRUCTION : Le texte ci-dessous a déjà été restructuré syntaxiquement. "
-            "Maintenant, travaillez sur le RYTHME et le VOCABULAIRE. Créez une variation "
-            "extrême de longueur de phrases (burstiness). Remplacez le vocabulaire "
-            "académique lourd par des mots naturels. Ajoutez des marqueurs conversationnels.\n\n"
+            "INSTRUCTION : Réécrivez, restructurez et humanisez en profondeur les paragraphes suivants. "
+            "Appliquez toutes les règles de restructuration syntaxique, de burstiness, de vocabulaire fluide "
+            "et d'imperfections authentiques.\n\n"
         ),
-    },
-    {
-        "name": "Pass 3 — Naturalness Polish",
-        "system_prompt": PASS_3_SYSTEM_PROMPT,
-        "temperature": 0.85,
-        "user_prompt_prefix": (
-            "INSTRUCTION : Le texte ci-dessous a déjà été restructuré et rythmé. "
-            "Effectuez un polissage final. Ajoutez de subtiles imperfections humaines "
-            "(reformulations, apartés, questions rhétoriques avec parcimonie). "
-            "Éliminez tout pattern IA résiduel. Le texte doit sonner parfaitement humain.\n\n"
-        ),
-    },
+    }
 ]
 
 
@@ -504,7 +349,7 @@ class FrenchHumanizer:
     # Single full pass over all paragraphs
     # ------------------------------------------------------------------
 
-    def _run_single_pass(
+    async def _run_single_pass(
         self,
         paragraphs: List[str],
         pass_config: Dict,
@@ -512,12 +357,12 @@ class FrenchHumanizer:
     ) -> List[str]:
         """
         Runs one complete pass over all paragraphs using the given configuration.
-        Handles batching, fallback, and error propagation.
+        Processes paragraph batches concurrently using asyncio.gather and thread-pool execution.
         """
         pass_name = pass_config["name"]
         total = len(paragraphs)
         logger.info(
-            f"[{pass_name}] Starting pass {pass_number}/3 — "
+            f"[{pass_name}] Starting pass {pass_number}/1 — "
             f"{total} paragraph(s), batch_size={self.batch_size}, "
             f"temperature={pass_config['temperature']}"
         )
@@ -533,13 +378,12 @@ class FrenchHumanizer:
 
         results = [""] * len(cleaned)
 
-        # Process in batches
+        # Process in batches concurrently
         num_batches = (len(non_empty_paragraphs) + self.batch_size - 1) // self.batch_size
-        for batch_idx, i in enumerate(
-            range(0, len(non_empty_paragraphs), self.batch_size)
-        ):
-            chunk = non_empty_paragraphs[i : i + self.batch_size]
-            chunk_indices = non_empty_indices[i : i + self.batch_size]
+
+        async def process_batch_task(batch_idx: int, start_idx: int):
+            chunk = non_empty_paragraphs[start_idx : start_idx + self.batch_size]
+            chunk_indices = non_empty_indices[start_idx : start_idx + self.batch_size]
 
             logger.info(
                 f"[{pass_name}] Processing batch {batch_idx + 1}/{num_batches} "
@@ -548,16 +392,24 @@ class FrenchHumanizer:
 
             # Emit progress callback so the SSE stream can update the frontend
             if self.progress_callback:
-                self.progress_callback({
+                prog_data = {
                     "pass_number": pass_number,
                     "pass_name": pass_name,
                     "batch": batch_idx + 1,
                     "total_batches": num_batches,
                     "message": f"{pass_name} — batch {batch_idx + 1}/{num_batches}"
-                })
+                }
+                try:
+                    if asyncio.iscoroutinefunction(self.progress_callback):
+                        await self.progress_callback(prog_data)
+                    else:
+                        self.progress_callback(prog_data)
+                except Exception as cb_err:
+                    logger.error(f"Error in progress callback: {cb_err}")
 
             try:
-                humanized_chunk = self._humanize_chunk(chunk, pass_config)
+                # Call blocking humanize_chunk inside a thread
+                humanized_chunk = await asyncio.to_thread(self._humanize_chunk, chunk, pass_config)
 
                 if len(humanized_chunk) == len(chunk):
                     for idx, humanized_p in zip(chunk_indices, humanized_chunk):
@@ -568,14 +420,11 @@ class FrenchHumanizer:
                         f"got {len(humanized_chunk)}). Falling back to sequential."
                     )
                     for idx, p in zip(chunk_indices, chunk):
-                        results[idx] = self._humanize_single_paragraph(
-                            p, pass_config
-                        )
+                        results[idx] = await asyncio.to_thread(self._humanize_single_paragraph, p, pass_config)
 
             except (RateLimitError, GeminiAPIError) as e:
                 logger.error(
-                    f"[{pass_name}] Fatal Gemini error at batch {batch_idx + 1}: {e}. "
-                    "Propagating."
+                    f"[{pass_name}] Fatal Gemini error at batch {batch_idx + 1}: {e}."
                 )
                 raise
             except Exception as e:
@@ -585,37 +434,41 @@ class FrenchHumanizer:
                 )
                 for idx, p in zip(chunk_indices, chunk):
                     try:
-                        results[idx] = self._humanize_single_paragraph(
-                            p, pass_config
-                        )
+                        results[idx] = await asyncio.to_thread(self._humanize_single_paragraph, p, pass_config)
                     except (RateLimitError, GeminiAPIError) as inner_e:
                         logger.error(
-                            f"[{pass_name}] Fatal Gemini error in fallback "
-                            f"at paragraph {idx}: {inner_e}"
+                            f"[{pass_name}] Fatal Gemini error in fallback at paragraph {idx}: {inner_e}"
                         )
                         raise
                     except Exception as inner_e:
                         logger.error(
-                            f"[{pass_name}] Fallback failed for paragraph {idx}: "
-                            f"{inner_e}. Preserving text from previous pass."
+                            f"[{pass_name}] Fallback failed for paragraph {idx}: {inner_e}. "
+                            "Preserving text from previous pass."
                         )
                         results[idx] = p
+
+        # Spawn all batch tasks concurrently
+        tasks = [
+            process_batch_task(batch_idx, i)
+            for batch_idx, i in enumerate(range(0, len(non_empty_paragraphs), self.batch_size))
+        ]
+        await asyncio.gather(*tasks)
 
         # Restore blank paragraphs
         for i, p in enumerate(cleaned):
             if not p:
                 results[i] = paragraphs[i]
 
-        logger.info(f"[{pass_name}] Pass {pass_number}/3 complete.")
+        logger.info(f"[{pass_name}] Pass {pass_number}/1 complete.")
         return results
 
     # ------------------------------------------------------------------
     # Multi-pass pipeline
     # ------------------------------------------------------------------
 
-    def humanize_paragraphs(self, paragraphs: List[str]) -> List[str]:
+    async def humanize_paragraphs(self, paragraphs: List[str]) -> List[str]:
         """
-        Humanizes a list of French paragraphs through 3 specialized passes.
+        Humanizes a list of French paragraphs through the single unified pass.
 
         Args:
             paragraphs: List of paragraphs in French to humanize.
@@ -630,24 +483,24 @@ class FrenchHumanizer:
         current_paragraphs = list(paragraphs)
 
         for pass_number, pass_config in enumerate(PASS_CONFIGS, start=1):
-            current_paragraphs = self._run_single_pass(
+            current_paragraphs = await self._run_single_pass(
                 current_paragraphs, pass_config, pass_number
             )
-            # Small delay between passes to avoid rate-limiting bursts
+            # Small delay between passes if there were multiple passes
             if pass_number < len(PASS_CONFIGS):
                 delay = random.uniform(1.0, 2.0)
                 logger.debug(
                     f"Inter-pass delay: {delay:.1f}s before pass {pass_number + 1}"
                 )
-                time.sleep(delay)
+                await asyncio.sleep(delay)
 
-        logger.info("All 3 humanization passes complete.")
+        logger.info("All humanization passes complete.")
         return current_paragraphs
 
-    def humanize_text(self, text: str) -> str:
+    async def humanize_text(self, text: str) -> str:
         """
         Splits a text document by double-newlines into paragraphs,
-        humanizes each through the 3-pass pipeline, and reconstructs.
+        humanizes each through the pipeline, and reconstructs.
 
         Args:
             text: Full text document in French.
@@ -661,11 +514,10 @@ class FrenchHumanizer:
         paragraphs = text.split("\n\n")
 
         logger.info(
-            f"Starting multi-pass humanization: {len(paragraphs)} paragraph(s) "
-            f"across 3 passes."
+            f"Starting unified humanization: {len(paragraphs)} paragraph(s)."
         )
 
-        humanized_paragraphs = self.humanize_paragraphs(paragraphs)
+        humanized_paragraphs = await self.humanize_paragraphs(paragraphs)
         return "\n\n".join(humanized_paragraphs)
 
 
@@ -703,10 +555,10 @@ if __name__ == "__main__":
     try:
         humanizer = FrenchHumanizer(api_key=key)
 
-        print("\nRunning 3-pass humanization pipeline...")
-        humanized_text = humanizer.humanize_text(sample_text)
+        print("\nRunning unified humanization pipeline...")
+        humanized_text = asyncio.run(humanizer.humanize_text(sample_text))
 
-        print("\n--- HUMANIZED FRENCH TEXT (3 passes) ---")
+        print("\n--- HUMANIZED FRENCH TEXT (Unified) ---")
         print(humanized_text)
         print("-----------------------------------------")
 

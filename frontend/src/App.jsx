@@ -33,6 +33,9 @@ export default function App() {
   const [afterMetrics, setAfterMetrics] = useState(null);
   const [originalSnippet, setOriginalSnippet] = useState('');
   const [humanizedSnippet, setHumanizedSnippet] = useState('');
+  const [fullOriginalText, setFullOriginalText] = useState('');
+  const [fullHumanizedText, setFullHumanizedText] = useState('');
+  const [isUpdatingDoc, setIsUpdatingDoc] = useState(false);
 
   // --- COMPATIBILITY CONNECTION CHECK ---
   useEffect(() => {
@@ -177,6 +180,8 @@ export default function App() {
                 } else if (event.status === 'completed') {
                   setProgress(100);
                   setStatusMessage('Document rephrased and compiled successfully.');
+                  setFullOriginalText(event.original_text || '');
+                  setFullHumanizedText(event.humanized_text || '');
                   setAfterMetrics({
                     word_count: event.metrics.word_count,
                     sentence_count: event.metrics.sentence_count,
@@ -224,6 +229,19 @@ export default function App() {
           clearInterval(interval);
           setProgress(100);
           setStatusMessage('Document rephrased and compiled successfully.');
+          
+          setFullOriginalText(`En conclusion, il convient de souligner que l'analyse des résultats démontre de surcroît l'efficacité de cette technologie.
+          
+De plus, il est important de noter que les collaborateurs ont fait preuve d'une adaptation rapide et proactive en effet.
+
+En résumé, il convient de rappeler que la formation continue constitue un facteur clé de réussite absolue.`);
+          
+          setFullHumanizedText(`Pour conclure, l'analyse des résultats met en évidence à quel point cette technologie s'avère particulièrement efficace.
+
+Par ailleurs, on remarque que l'équipe s'est adaptée avec une rapidité et une réactivité exemplaires.
+
+En définitive, rappelons que l'apprentissage continu demeure le levier principal de notre réussite.`);
+          
           // Humanized statistics
           setAfterMetrics({
             word_count: 7912,
@@ -263,6 +281,46 @@ export default function App() {
     }
   };
 
+  // --- SAVE MANUAL EDITS HANDLER ---
+  const handleSaveEdits = async (newText) => {
+    if (connectionMode === 'live') {
+      setIsUpdatingDoc(true);
+      try {
+        const response = await fetch(`${API_BASE}/api/update/${fileId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ humanized_text: newText })
+        });
+        
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.detail || 'Failed to save document updates.');
+        }
+        
+        const data = await response.json();
+        setFullHumanizedText(newText);
+        // Update metrics in Dashboard dynamically
+        setAfterMetrics(prev => ({
+          ...prev,
+          ...data.metrics
+        }));
+        console.log("Document updated successfully with manual user edits.");
+      } catch (err) {
+        console.error("Error saving manual document updates:", err);
+        alert(err.message || "Failed to save edits.");
+      } finally {
+        setIsUpdatingDoc(false);
+      }
+    } else {
+      // Demo Mode offline saving
+      setFullHumanizedText(newText);
+      setAfterMetrics(prev => ({
+        ...prev,
+        word_count: newText.split(/\s+/).filter(Boolean).length
+      }));
+    }
+  };
+
   // --- RESET HANDLER ---
   const handleReset = () => {
     setFile(null);
@@ -271,6 +329,8 @@ export default function App() {
     setAfterMetrics(null);
     setOriginalSnippet('');
     setHumanizedSnippet('');
+    setFullOriginalText('');
+    setFullHumanizedText('');
     setProcessingStatus('idle');
     setProgress(0);
     setStatusMessage('');
@@ -565,10 +625,12 @@ export default function App() {
               }}
             />
 
-            {/* Side-by-side highlighter */}
+            {/* Side-by-side highlighter with interactive manual editing */}
             <TextPreview 
-              originalText={originalSnippet || "En conclusion, il convient de souligner que l'analyse des résultats démontre de surcroît l'efficacité de cette technologie."} 
-              humanizedText={humanizedSnippet || "Pour conclure, l'analyse des résultats met en évidence à quel point cette technologie s'avère particulièrement efficace."} 
+              originalText={fullOriginalText || originalSnippet || "En conclusion, il convient de souligner que l'analyse des résultats démontre de surcroît l'efficacité de cette technologie."} 
+              humanizedText={fullHumanizedText || humanizedSnippet || "Pour conclure, l'analyse des résultats met en évidence à quel point cette technologie s'avère particulièrement efficace."} 
+              onSaveEdits={handleSaveEdits}
+              isSaving={isUpdatingDoc}
             />
 
           </section>

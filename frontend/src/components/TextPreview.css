@@ -356,3 +356,101 @@
     transform: translateY(0);
   }
 }
+
+/* Interactive Side-by-Side Editor Styles */
+.diff-save-btn {
+  font-family: inherit;
+  font-size: 0.825rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-purple);
+  background: hsla(var(--purple-accent-hsl), 0.08);
+  color: var(--text-purple);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-all);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.diff-save-btn:hover:not(:disabled) {
+  background: var(--purple-accent);
+  color: #ffffff;
+  border-color: var(--purple-accent);
+  box-shadow: var(--glow-purple);
+}
+
+.diff-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editable-paragraph-preview {
+  position: relative;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: var(--transition-all);
+}
+
+.editable-paragraph-preview:hover {
+  background: rgba(129, 140, 248, 0.05);
+}
+
+.edit-indicator-icon {
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  background: var(--purple-accent);
+  color: #ffffff;
+  font-size: 0.65rem;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: var(--transition-all);
+  box-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+.editable-paragraph-preview:hover .edit-indicator-icon {
+  opacity: 0.8;
+}
+
+.paragraph-edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.premium-paragraph-textarea {
+  width: 100%;
+  min-height: 100px;
+  background: rgba(15, 23, 42, 0.95);
+  color: #ffffff;
+  border: 1px solid var(--border-purple);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.8;
+  resize: vertical;
+  outline: none;
+  box-shadow: 0 0 10px hsla(var(--purple-accent-hsl), 0.2);
+}
+
+.premium-paragraph-textarea:focus {
+  border-color: var(--text-purple);
+  box-shadow: var(--glow-purple);
+}
+
+.paragraph-edit-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0.25rem;
+}

@@ -235,5 +235,33 @@ class TestBackendRoutes(unittest.TestCase):
         self.assertIn("no editable paragraphs", events[0]["message"].lower())
         self.assertEqual(events[0]["metrics"]["word_count"], 0)
 
+    def test_update_document_route(self):
+        # 1. Upload valid document
+        with open(self.valid_docx_path, "rb") as f:
+            upload_resp = self.client.post(
+                "/api/upload",
+                files={"file": ("route_test_valid.docx", f, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+            )
+        self.assertEqual(upload_resp.status_code, 200)
+        file_id = upload_resp.json()["file_id"]
+        
+        # 2. Call update endpoint with modified text
+        updated_text = "Premier paragraphe réécrit manuellement.\n\nDeuxième paragraphe réécrit par l'utilisateur."
+        response = self.client.post(
+            f"/api/update/{file_id}",
+            json={"humanized_text": updated_text}
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("metrics", data)
+        self.assertGreater(data["metrics"]["word_count"], 0)
+        
+        # 3. Verify that we can download the updated document successfully
+        download_resp = self.client.get(f"/api/download/{file_id}")
+        self.assertEqual(download_resp.status_code, 200)
+        self.assertEqual(download_resp.headers["content-type"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
 if __name__ == '__main__':
     unittest.main()
