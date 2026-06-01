@@ -454,3 +454,108 @@
   align-items: center;
   padding: 0 0.25rem;
 }
+
+/* --- Paragraph Risk Highlighter & Hover tooltips --- */
+.diff-column.humanized {
+  position: relative;
+  border-left: 3px solid transparent;
+  padding-left: 1.25rem !important;
+  transition: all 0.3s ease;
+}
+
+.diff-column.humanized.risk-high {
+  border-left-color: #f43f5e;
+}
+.diff-column.humanized.risk-medium {
+  border-left-color: #f59e0b;
+}
+.diff-column.humanized.risk-low {
+  border-left-color: #10b981;
+}
+
+/* Hover glow overlay for risk classes */
+.diff-column.humanized.risk-high:hover {
+  background: rgba(244, 63, 94, 0.02);
+  box-shadow: inset 4px 0 10px rgba(244, 63, 94, 0.05);
+}
+.diff-column.humanized.risk-medium:hover {
+  background: rgba(245, 158, 11, 0.02);
+  box-shadow: inset 4px 0 10px rgba(245, 158, 11, 0.05);
+}
+.diff-column.humanized.risk-low:hover {
+  background: rgba(16, 185, 129, 0.02);
+  box-shadow: inset 4px 0 10px rgba(16, 185, 129, 0.05);
+}
+
+/* Risk score pill badge */
+.risk-score-pill {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  pointer-events: auto;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.diff-column.humanized:hover .risk-score-pill {
+  opacity: 1;
+}
+
+.risk-score-pill.high {
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.risk-score-pill.medium {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.risk-score-pill.low {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Tooltip overlay styling */
+.risk-tooltip-wrapper {
+  position: relative;
+}
+
+.risk-tooltip-wrapper:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  right: 0;
+  width: max-content;
+  max-width: 250px;
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid var(--border-glass-bright);
+  color: var(--text-vivid);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  z-index: 100;
+  pointer-events: none;
+  animation: tooltipFadeIn 0.2s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

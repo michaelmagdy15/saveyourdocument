@@ -76,7 +76,8 @@ export default function TextPreview({
   originalText = MOCK_ORIGINAL, 
   humanizedText = MOCK_HUMANIZED,
   onSaveEdits = null,
-  isSaving = false
+  isSaving = false,
+  paragraphRisks = []
 }) {
   const [viewMode, setViewMode] = useState('split'); // 'split' | 'unified' | 'clean'
   const [copied, setCopied] = useState(false);
@@ -296,6 +297,8 @@ export default function TextPreview({
               const origPara = originalParagraphs[idx] || '';
               const humanPara = editedParagraphs[idx] || '';
               const paragraphDiff = diffWords(origPara, humanPara);
+              const riskObj = (paragraphRisks && paragraphRisks[idx]) || null;
+              const riskClass = riskObj ? `risk-${riskObj.risk_level}` : '';
 
               return (
                 <div key={idx} className="diff-row">
@@ -317,11 +320,19 @@ export default function TextPreview({
                   </div>
 
                   {/* Humanized text block - double click to edit */}
-                  <div className="diff-column humanized">
+                  <div className={`diff-column humanized ${riskClass}`}>
                     <span className="diff-col-badge humanized">
                       <Sparkles size={13} />
                       Optimized Human Text
                     </span>
+                    {riskObj && (
+                      <span 
+                        className={`risk-score-pill ${riskObj.risk_level} risk-tooltip-wrapper`}
+                        data-tooltip={`AI Likelihood: ${riskObj.ai_score}%, Plagiarism Risk: ${riskObj.plagiarism_score}%`}
+                      >
+                        {riskObj.risk_level === 'high' ? '⚠️ High Risk' : riskObj.risk_level === 'medium' ? '⚡ Moderate' : '✓ Safe'}
+                      </span>
+                    )}
                     
                     {editingIndex === idx ? (
                       <div className="paragraph-edit-box">

@@ -16,8 +16,22 @@ export default function App() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [isApiKeySaved, setIsApiKeySaved] = useState(() => !!localStorage.getItem('syd_api_key'));
   
-  // Connection state (detecting, live, demo)
   const [connectionMode, setConnectionMode] = useState('detecting'); 
+  const [showPreloader, setShowPreloader] = useState(true);
+  const [fadeOutPreloader, setFadeOutPreloader] = useState(false);
+  
+  useEffect(() => {
+    if (connectionMode !== 'detecting') {
+      const timer = setTimeout(() => {
+        setFadeOutPreloader(true);
+        const removeTimer = setTimeout(() => {
+          setShowPreloader(false);
+        }, 800); // matches CSS transition duration
+        return () => clearTimeout(removeTimer);
+      }, 1200); // show preloader handshake info briefly
+      return () => clearTimeout(timer);
+    }
+  }, [connectionMode]);
   
   // Processing states
   const [processingStatus, setProcessingStatus] = useState('idle'); // idle, uploading, humanizing, completed, error
@@ -36,6 +50,9 @@ export default function App() {
   const [fullOriginalText, setFullOriginalText] = useState('');
   const [fullHumanizedText, setFullHumanizedText] = useState('');
   const [isUpdatingDoc, setIsUpdatingDoc] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState('balanced');
+  const [isNgramShieldEnabled, setIsNgramShieldEnabled] = useState(true);
+  const [paragraphRisks, setParagraphRisks] = useState([]);
 
   // --- COMPATIBILITY CONNECTION CHECK ---
   useEffect(() => {
@@ -99,6 +116,7 @@ export default function App() {
         const data = await response.json();
         setFileId(data.file_id);
         setBeforeMetrics(data.metrics);
+        setParagraphRisks(data.paragraph_risks || []);
         setProcessingStatus('idle');
         setProgress(0);
         setStatusMessage('Document uploaded and metrics pre-calculated. Ready to humanize.');
@@ -121,6 +139,11 @@ export default function App() {
           grade_level: 'Graduate (Extremely Complex)',
           vocabulary_richness: 0.38
         });
+        setParagraphRisks([
+          { ai_score: 95.0, plagiarism_score: 88.0, risk_level: 'high' },
+          { ai_score: 92.0, plagiarism_score: 75.0, risk_level: 'high' },
+          { ai_score: 90.0, plagiarism_score: 80.0, risk_level: 'high' }
+        ]);
         setProcessingStatus('idle');
         setProgress(0);
         setStatusMessage('Document uploaded in demo mode. Ready to humanize.');
@@ -143,7 +166,9 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             file_id: fileId,
-            api_key: apiKey || null
+            api_key: apiKey || null,
+            preset: selectedPreset,
+            ngram_shield: isNgramShieldEnabled
           })
         });
 
@@ -182,6 +207,7 @@ export default function App() {
                   setStatusMessage('Document rephrased and compiled successfully.');
                   setFullOriginalText(event.original_text || '');
                   setFullHumanizedText(event.humanized_text || '');
+                  setParagraphRisks(event.paragraph_risks || []);
                   setAfterMetrics({
                     word_count: event.metrics.word_count,
                     sentence_count: event.metrics.sentence_count,
@@ -242,6 +268,12 @@ Par ailleurs, on remarque que l'équipe s'est adaptée avec une rapidité et une
 
 En définitive, rappelons que l'apprentissage continu demeure le levier principal de notre réussite.`);
           
+          setParagraphRisks([
+            { ai_score: 4.5, plagiarism_score: 12.0, risk_level: 'low' },
+            { ai_score: 3.2, plagiarism_score: 8.5, risk_level: 'low' },
+            { ai_score: 5.0, plagiarism_score: 15.0, risk_level: 'low' }
+          ]);
+          
           // Humanized statistics
           setAfterMetrics({
             word_count: 7912,
@@ -299,6 +331,7 @@ En définitive, rappelons que l'apprentissage continu demeure le levier principa
         
         const data = await response.json();
         setFullHumanizedText(newText);
+        setParagraphRisks(data.paragraph_risks || []);
         // Update metrics in Dashboard dynamically
         setAfterMetrics(prev => ({
           ...prev,
@@ -335,6 +368,7 @@ En définitive, rappelons que l'apprentissage continu demeure le levier principa
     setProgress(0);
     setStatusMessage('');
     setErrorMessage('');
+    setParagraphRisks([]);
     setActiveStep(1);
   };
 
@@ -560,6 +594,44 @@ En définitive, rappelons que l'apprentissage continu demeure le levier principa
               </div>
             )}
 
+            {/* Style Presets and N-gram Shield Controls */}
+            {processingStatus !== 'humanizing' && processingStatus !== 'completed' && (
+              <div className="presets-control-panel glass-card">
+                <h4>Advanced Anti-Detection Adjustments</h4>
+                <div className="presets-grid">
+                  <div className="preset-selector-group">
+                    <label htmlFor="preset-select">Linguistic Preset Style:</label>
+                    <select
+                      id="preset-select"
+                      value={selectedPreset}
+                      onChange={(e) => setSelectedPreset(e.target.value)}
+                      className="premium-select"
+                    >
+                      <option value="balanced">Balanced (Default Recommended)</option>
+                      <option value="burstiness">Burstiness Heavy (High Rythmic Contrast)</option>
+                      <option value="academic">Academic Guard (Rigor & Formal Precision)</option>
+                      <option value="creative">Creative Flow (Expressive Human Texture)</option>
+                    </select>
+                  </div>
+                  
+                  <div className="preset-toggle-group">
+                    <label className="toggle-switch-container">
+                      <input
+                        type="checkbox"
+                        checked={isNgramShieldEnabled}
+                        onChange={(e) => setIsNgramShieldEnabled(e.target.checked)}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                    <div className="toggle-label-desc">
+                      <span className="toggle-main-label">Plagiarism N-gram Shield</span>
+                      <span className="toggle-sub-label">Aggressive Turnitin signature scrambler (scrapes repeated multi-word patterns)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Run button */}
             {processingStatus !== 'completed' && (
               <div className="run-btn-container">
@@ -631,6 +703,7 @@ En définitive, rappelons que l'apprentissage continu demeure le levier principa
               humanizedText={fullHumanizedText || humanizedSnippet || "Pour conclure, l'analyse des résultats met en évidence à quel point cette technologie s'avère particulièrement efficace."} 
               onSaveEdits={handleSaveEdits}
               isSaving={isUpdatingDoc}
+              paragraphRisks={paragraphRisks}
             />
 
           </section>
@@ -647,6 +720,35 @@ En définitive, rappelons que l'apprentissage continu demeure le levier principa
           </span>
         </div>
       </footer>
+
+      {/* Space Handshake Preloader */}
+      {showPreloader && (
+        <div className={`space-preloader-overlay ${fadeOutPreloader ? 'fade-out' : ''}`}>
+          <div className="preloader-glass-card">
+            <div className="preloader-brand-logo">
+              <Sparkles size={40} className="glowing-logo-spinner" />
+            </div>
+            <h1 className="preloader-title">SAVEYOURDOCUMENT</h1>
+            <p className="preloader-subtitle">Bypass AI Detection & Plagiarism Checks</p>
+            
+            <div className="preloader-visual-bar">
+              <div className="preloader-bar-fill"></div>
+            </div>
+            
+            <div className="preloader-terminal-log">
+              <span className="log-line">INITIALIZING SECURE HANDSHAKE ENGINE...</span>
+              {connectionMode === 'detecting' ? (
+                <span className="log-line pulsing-log">SEARCHING FOR API CONTROLLERS...</span>
+              ) : connectionMode === 'live' ? (
+                <span className="log-line success-log">✓ SECURE HANDSHAKE COMPLETED (API ONLINE)</span>
+              ) : (
+                <span className="log-line warning-log">⚠ SECURE EMULATION ACTIVE (DEMO MODE READY)</span>
+              )}
+            </div>
+          </div>
+          <div className="preloader-stars-layer"></div>
+        </div>
+      )}
     </div>
   );
 }

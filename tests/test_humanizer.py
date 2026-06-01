@@ -11,10 +11,11 @@ from backend.humanizer import (
     HumanizerError,
     GeminiAPIError,
     RateLimitError,
+    PASS_CONFIGS,
 )
 
 
-class TestFrenchHumanizer(unittest.TestCase):
+class TestFrenchHumanizer(unittest.IsolatedAsyncioTestCase):
     """Test cases for the FrenchHumanizer class."""
 
     def setUp(self):
@@ -35,7 +36,7 @@ class TestFrenchHumanizer(unittest.TestCase):
             self.assertEqual(humanizer.api_key, "env-key")
 
     @patch("requests.post")
-    def test_successful_batch_humanization(self, mock_post):
+    async def test_successful_batch_humanization(self, mock_post):
         """Test successful batch rephrasing with matching paragraph count."""
         # Mock successful API response containing structured output
         mock_response = MagicMock()
@@ -56,13 +57,13 @@ class TestFrenchHumanizer(unittest.TestCase):
         mock_post.return_value = mock_response
 
         input_paragraphs = ["Paragraphe un original", "Paragraphe deux original"]
-        result = self.humanizer.humanize_paragraphs(input_paragraphs)
+        result = await self.humanizer.humanize_paragraphs(input_paragraphs)
 
         self.assertEqual(result, ["Paragraphe un réécrit", "Paragraphe deux réécrit"])
         mock_post.assert_called_once()
 
     @patch("requests.post")
-    def test_markdown_code_block_parsing(self, mock_post):
+    async def test_markdown_code_block_parsing(self, mock_post):
         """Test that json wrapped in markdown code blocks is correctly parsed."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -81,11 +82,11 @@ class TestFrenchHumanizer(unittest.TestCase):
         }
         mock_post.return_value = mock_response
 
-        result = self.humanizer.humanize_paragraphs(["Original"])
+        result = await self.humanizer.humanize_paragraphs(["Original"])
         self.assertEqual(result, ["Humanized"])
 
     @patch("requests.post")
-    def test_batch_mismatch_fallback(self, mock_post):
+    async def test_batch_mismatch_fallback(self, mock_post):
         """Test sequential fallback if batch output length is mismatched."""
         # 1. First call returns mismatch (e.g. returns 1 paragraph instead of 2)
         mock_mismatch = MagicMock()
@@ -141,13 +142,13 @@ class TestFrenchHumanizer(unittest.TestCase):
         mock_post.side_effect = [mock_mismatch, mock_single_1, mock_single_2]
 
         input_paragraphs = ["Original un", "Original deux"]
-        result = self.humanizer.humanize_paragraphs(input_paragraphs)
+        result = await self.humanizer.humanize_paragraphs(input_paragraphs)
 
         self.assertEqual(result, ["Paragraphe un réécrit", "Paragraphe deux réécrit"])
         self.assertEqual(mock_post.call_count, 3)
 
     @patch("requests.post")
-    def test_rate_limit_retry_success(self, mock_post):
+    async def test_rate_limit_retry_success(self, mock_post):
         """Test retrying upon receiving HTTP 429 and eventually succeeding."""
         # Mock 429 response
         mock_rate_limit = MagicMock()
@@ -176,7 +177,7 @@ class TestFrenchHumanizer(unittest.TestCase):
         # Patch time.sleep to run instantly
         with patch("time.sleep") as mock_sleep:
             humanizer = FrenchHumanizer(api_key=self.api_key, batch_size=1, max_retries=2, backoff_factor=2)
-            result = humanizer.humanize_paragraphs(["Original"])
+            result = await humanizer.humanize_paragraphs(["Original"])
 
             self.assertEqual(result, ["Succès"])
             self.assertEqual(mock_post.call_count, 2)
@@ -193,9 +194,10 @@ class TestFrenchHumanizer(unittest.TestCase):
         with patch("time.sleep"):
             humanizer = FrenchHumanizer(api_key=self.api_key, batch_size=1, max_retries=1)
             with self.assertRaises(RateLimitError):
-                humanizer._humanize_chunk(["Original"])
+                humanizer._humanize_chunk(["Original"], PASS_CONFIGS[0])
 
-    def test_empty_paragraph_preservation(self):
+    @patch("requests.post")
+    async def test_empty_paragraph_preservation(self, mock_post):
         """Test empty paragraphs are preserved and not sent to API."""
         input_paragraphs = ["Original un", "", "Original deux", "   ", "Original trois"]
         
@@ -215,23 +217,23 @@ class TestFrenchHumanizer(unittest.TestCase):
                 }
             ]
         }
+        mock_post.return_value = mock_success
 
-        with patch("requests.post", return_value=mock_success) as mock_post:
-            humanizer = FrenchHumanizer(api_key=self.api_key, batch_size=5)
-            result = humanizer.humanize_paragraphs(input_paragraphs)
-            
-            # Mappings should align perfectly, preserving the index of empty paragraphs
-            self.assertEqual(result, ["Réécrit un", "", "Réécrit deux", "   ", "Réécrit trois"])
-            
-            # The API call should have received only the 3 non-empty paragraphs
-            mock_post.assert_called_once()
-            called_args, called_kwargs = mock_post.call_args
-            sent_payload = called_kwargs["json"]
-            sent_prompt = sent_payload["contents"][0]["parts"][0]["text"]
-            self.assertIn("Original un", sent_prompt)
-            self.assertIn("Original deux", sent_prompt)
-            self.assertIn("Original trois", sent_prompt)
-            self.assertNotIn("   ", sent_prompt)
+        humanizer = FrenchHumanizer(api_key=self.api_key, batch_size=5)
+        result = await humanizer.humanize_paragraphs(input_paragraphs)
+        
+        # Mappings should align perfectly, preserving the index of empty paragraphs
+        self.assertEqual(result, ["Réécrit un", "", "Réécrit deux", "   ", "Réécrit trois"])
+        
+        # The API call should have received only the 3 non-empty paragraphs
+        mock_post.assert_called_once()
+        called_args, called_kwargs = mock_post.call_args
+        sent_payload = called_kwargs["json"]
+        sent_prompt = sent_payload["contents"][0]["parts"][0]["text"]
+        self.assertIn("Original un", sent_prompt)
+        self.assertIn("Original deux", sent_prompt)
+        self.assertIn("Original trois", sent_prompt)
+        self.assertNotIn("   ", sent_prompt)
 
 
 if __name__ == "__main__":

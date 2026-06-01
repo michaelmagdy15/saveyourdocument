@@ -223,21 +223,24 @@ class FrenchPostProcessor:
         burstiness_target_cv: float = 0.40,
         informal_chance: float = 0.30,
         seed: Optional[int] = None,
+        ngram_shield: bool = True,
     ):
         self.burstiness_target_cv = burstiness_target_cv
         self.informal_chance = informal_chance
+        self.ngram_shield = ngram_shield
         if seed is not None:
             random.seed(seed)
         logger.info(
             "FrenchPostProcessor initialised  (cv_target=%.2f, informal=%.0f%%, "
-            "clichés=%d)",
+            "clichés=%d, ngram_shield=%s)",
             burstiness_target_cv,
             informal_chance * 100,
             _TOTAL_CLICHES,
+            ngram_shield,
         )
 
     # ── public entry point ────────────────────────────────────────────
-    def process(self, text: str) -> str:
+    def process(self, text: str, ngram_shield: Optional[bool] = None) -> str:
         """Run all transformation layers and return the processed text."""
         if not text or not text.strip():
             return text
@@ -245,11 +248,20 @@ class FrenchPostProcessor:
         original_len = len(text)
         logger.info("▶ post-processing start (%d chars)", original_len)
 
+        # Allow local parameter override or fall back to instance level
+        shield_active = ngram_shield if ngram_shield is not None else self.ngram_shield
+
         text = self._apply_cliche_killer(text)
         text = self._apply_contractions(text)
         text = self._apply_rhythm_injector(text)
         text = self._apply_punctuation_naturalizer(text)
-        text = self._apply_ngram_breaker(text)
+        
+        if shield_active:
+            logger.info("🛡️ Aggressive Plagiarism N-gram Shield activated (passes for N=5, 4, 3).")
+            for n_val in [5, 4, 3]:
+                text = self._apply_ngram_breaker(text, n=n_val)
+        else:
+            text = self._apply_ngram_breaker(text, n=4)
 
         logger.info(
             "✔ post-processing done (%d → %d chars, Δ%+d)",
@@ -488,10 +500,9 @@ class FrenchPostProcessor:
     # ------------------------------------------------------------------
     # 5. N-gram Breaker
     # ------------------------------------------------------------------
-    def _apply_ngram_breaker(self, text: str) -> str:
+    def _apply_ngram_breaker(self, text: str, n: int = 4) -> str:
         mask = _build_protection_mask(text)
         words = text.split()
-        n = 4
         changes = 0
 
         if len(words) < n * 2:

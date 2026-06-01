@@ -57,18 +57,45 @@ def calculate_metrics(text: str) -> dict:
         "estimated_reading_time_seconds": res.get("estimated_reading_time_seconds", 0)
     }
 
-async def humanize_text(text: str, api_key: Optional[str] = None) -> str:
-    post_processor = FrenchPostProcessor()
+def calculate_paragraph_risks(text: str) -> list:
+    if not text:
+        return []
+    paragraphs = [p.strip() for p in text.split("\n\n")]
+    paragraphs = [p for p in paragraphs if p]
+    
+    results = []
+    for p in paragraphs:
+        res = get_text_metrics(p)
+        ai_score = res.get("ai_probability_score", 0.0)
+        plag_score = res.get("plagiarism_risk_score", 0.0)
+        max_score = max(ai_score, plag_score)
+        
+        if max_score > 60:
+            risk_level = "high"
+        elif max_score > 30:
+            risk_level = "medium"
+        else:
+            risk_level = "low"
+            
+        results.append({
+            "ai_score": ai_score,
+            "plagiarism_score": plag_score,
+            "risk_level": risk_level
+        })
+    return results
+
+async def humanize_text(text: str, api_key: Optional[str] = None, preset: str = "balanced", ngram_shield: bool = True) -> str:
+    post_processor = FrenchPostProcessor(ngram_shield=ngram_shield)
     key = api_key or os.environ.get("GEMINI_API_KEY")
     if not key:
         logger.warning("No Gemini API key provided. Using local rule-based humanizer.")
         logger.info("Applying FrenchPostProcessor for local post-processing...")
-        return post_processor.process(text)
+        return post_processor.process(text, ngram_shield=ngram_shield)
 
-    humanizer = FrenchHumanizer(api_key=key, batch_size=2)
+    humanizer = FrenchHumanizer(api_key=key, batch_size=2, preset=preset)
     result = await humanizer.humanize_text(text)
     logger.info("Applying anti-detection post-processing...")
-    return post_processor.process(result)
+    return post_processor.process(result, ngram_shield=ngram_shield)
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -143,6 +170,8 @@ async def startup_event():
 class HumanizeRequest(BaseModel):
     file_id: str
     api_key: Optional[str] = None
+    preset: Optional[str] = "balanced"
+    ngram_shield: Optional[bool] = True
 
 @app.get("/")
 def read_root():
@@ -233,10 +262,12 @@ async def upload_file(file: UploadFile = File(...)):
         logger.info("Step 13: Summary generation completed successfully.")
         
         logger.info(f"Step 14: File upload and processing workflow finished successfully for file ID: {file_id}. Word count: {before_metrics['word_count']}.")
+        para_risks = calculate_paragraph_risks(full_text)
         return {
             "file_id": file_id,
             "metrics": before_metrics,
-            "summary": summary
+            "summary": summary,
+            "paragraph_risks": para_risks
         }
     except Exception as e:
         logger.error(f"Error occurred during post-upload file processing: {e}")
@@ -343,7 +374,7 @@ async def humanize_endpoint(request: HumanizeRequest):
                     try:
                         # Call the blocking humanizer function in a separate thread to keep the event loop responsive
                         start_time = asyncio.get_event_loop().time()
-                        hum_text = await humanize_text(orig_text, api_key)
+                        hum_text = await humanize_text(orig_text, api_key, preset=request.preset, ngram_shield=request.ngram_shield)
                         duration = asyncio.get_event_loop().time() - start_time
                         logger.info(f"Successfully humanized chunk {chunk_idx+1}/{total_chunks} (index {c_index}) in {duration:.2f}s")
                         
@@ -475,6 +506,7 @@ async def humanize_endpoint(request: HumanizeRequest):
             
             # CPU-bound metrics calculation run in a separate thread
             after_metrics = await asyncio.to_thread(calculate_metrics, full_humanized_text)
+            para_risks = await asyncio.to_thread(calculate_paragraph_risks, full_humanized_text)
             
             # Yield completed event
             final_data = {
@@ -483,6 +515,7 @@ async def humanize_endpoint(request: HumanizeRequest):
                 "metrics": after_metrics,
                 "original_text": full_original_text,
                 "humanized_text": full_humanized_text,
+                "paragraph_risks": para_risks,
                 "message": "Humanization completed successfully."
             }
             logger.info(f"Successfully completed humanizing file: {file_id}")
@@ -543,11 +576,13 @@ async def update_document(file_id: str, request: UpdateDocumentRequest):
         # Recalculate metrics for updated document
         full_text = "\n\n".join(new_paragraphs)
         updated_metrics = await asyncio.to_thread(calculate_metrics, full_text)
+        para_risks = await asyncio.to_thread(calculate_paragraph_risks, full_text)
         
         logger.info(f"Successfully updated and saved document: {file_id}")
         return {
             "status": "success",
-            "metrics": updated_metrics
+            "metrics": updated_metrics,
+            "paragraph_risks": para_risks
         }
     except Exception as e:
         logger.exception(f"Failed to update document {file_id}: {e}")

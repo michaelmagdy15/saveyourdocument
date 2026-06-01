@@ -488,3 +488,85 @@
   height: 12px;
   border-radius: var(--radius-xs);
 }
+
+/* --- Speedometer Gauges --- */
+.speedometers-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  padding: 1.5rem 0;
+  width: 100%;
+}
+
+.speedometer-gauge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 1.5rem 2rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-sm);
+  min-width: 240px;
+}
+
+.speedometer-gauge-card:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-3px);
+  box-shadow: var(--glow-purple), var(--shadow-md);
+}
+
+.speedometer-gauge-card h5 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-vivid);
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.speedometer-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 200px;
+  height: 140px;
+}
+
+.speedometer-info {
+  position: absolute;
+  bottom: 0px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  pointer-events: none;
+}
+
+.speedometer-value {
+  font-family: var(--mono);
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.speedometer-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.25rem;
+}
+

@@ -150,12 +150,12 @@ class TestDocxProcessor(unittest.TestCase):
         
         # Verify formatting preservation
         # For new_paragraphs[1] (originally p1), it had three runs: "This is the first paragraph. ", "It has bold text.", " And some italic text."
-        # After replace_paragraph_text, runs[0] has the new text, and runs[1:] are empty.
+        # After replace_paragraph_text, the new text is distributed proportionally across non-empty runs
         # Let's inspect:
         p1_runs = new_paragraphs[1].runs
-        self.assertEqual(p1_runs[0].text, "This is a rephrased paragraph with bold and italic details.")
-        for r in p1_runs[1:]:
-            self.assertEqual(r.text, "")
+        self.assertEqual(p1_runs[0].text.strip(), "This is a rephrased")
+        self.assertEqual(p1_runs[1].text.strip(), "paragraph with bold")
+        self.assertEqual(p1_runs[2].text.strip(), "and italic details.")
             
         # Check list item style remains
         self.assertEqual(new_paragraphs[3].style.name, 'List Number')

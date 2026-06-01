@@ -84,6 +84,72 @@ const CustomBarTooltip = ({ active, payload, label }) => {
   return null;
 };
 
+// Premium Speedometer Gauge Component
+function Speedometer({ score, title }) {
+  // Map score (0-100) to rotation angle (-90deg to 90deg for a half-circle)
+  const angle = (score / 100) * 180 - 90;
+  
+  let color = '#10b981'; // Emerald Green (passed/low risk)
+  let label = 'LOW DETECTION';
+  if (score > 60) {
+    color = '#f43f5e'; // Crimson Red (high risk)
+    label = 'HIGH RISK';
+  } else if (score > 30) {
+    color = '#f59e0b'; // Amber Yellow (medium risk)
+    label = 'MODERATE';
+  }
+  
+  return (
+    <div className="speedometer-gauge-card">
+      <h5>{title}</h5>
+      <div className="speedometer-wrapper">
+        <svg width="200" height="120" viewBox="0 0 200 120">
+          {/* Background track */}
+          <path
+            d="M20 100 A 80 80 0 0 1 180 100"
+            fill="none"
+            stroke="rgba(255,255,255,0.05)"
+            strokeWidth="10"
+            strokeLinecap="round"
+          />
+          {/* Active indicator arc */}
+          <path
+            d="M20 100 A 80 80 0 0 1 180 100"
+            fill="none"
+            stroke={color}
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeDasharray="251.2"
+            strokeDashoffset={251.2 - (score / 100) * 251.2}
+            style={{ transition: 'stroke-dashoffset 1.5s ease-in-out, stroke 1.5s' }}
+          />
+          {/* Gauge Center Pin */}
+          <circle cx="100" cy="100" r="6" fill="#f8fafc" />
+          {/* Pointer Needle */}
+          <line
+            x1="100"
+            y1="100"
+            x2="100"
+            y2="40"
+            stroke="#f8fafc"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            style={{
+              transform: `rotate(${angle}deg)`,
+              transformOrigin: '100px 100px',
+              transition: 'transform 1.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}
+          />
+        </svg>
+        <div className="speedometer-info">
+          <span className="speedometer-value" style={{ color }}>{score}%</span>
+          <span className="speedometer-label" style={{ color }}>{label}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard({ stats: propStats }) {
   const stats = { ...DEFAULT_STATS, ...(propStats || {}) };
   const humanDiff = (stats.humanScoreAfter ?? 0) - (stats.humanScoreBefore ?? 0);
@@ -254,88 +320,32 @@ export default function Dashboard({ stats: propStats }) {
 
       {/* Charts Layout Grid */}
       <div className="charts-grid">
-        {/* Card 1: Human vs AI Side-by-Side Pie Charts */}
+        {/* Card 1: Plagiarism & AI Risk Speedometer Gauges */}
         <div className="chart-card">
           <div className="chart-header">
             <div className="chart-title">
-              <h4>Linguistic Fingerprint</h4>
-              <p>Comparison of human-like patterns versus AI writing patterns</p>
+              <h4>Detection Risk Profile</h4>
+              <p>Real-time AI detection index metrics comparison</p>
             </div>
           </div>
           
-          <div className="pie-charts-container">
-            {/* Before Pie */}
-            <div className="pie-chart-item">
-              <span className="pie-chart-label">Original Text</span>
-              <div className="pie-chart-relative-wrapper">
-                <ResponsiveContainer width={170} height={170}>
-                  <PieChart>
-                    <Pie
-                      data={pieDataBefore}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={70}
-                      paddingAngle={4}
-                      dataKey="value"
-                      stroke="rgba(15, 23, 42, 0.95)"
-                      strokeWidth={2}
-                    >
-                      {pieDataBefore.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} style={{ outline: 'none' }} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomPieTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pie-center-label">
-                  <div className="pie-center-value" style={{ color: '#f43f5e' }}>{stats.aiScoreBefore}%</div>
-                  <div className="pie-center-desc">AI Score</div>
-                </div>
-              </div>
-            </div>
-
-            {/* After Pie */}
-            <div className="pie-chart-item">
-              <span className="pie-chart-label">Humanized Text</span>
-              <div className="pie-chart-relative-wrapper">
-                <ResponsiveContainer width={170} height={170}>
-                  <PieChart>
-                    <Pie
-                      data={pieDataAfter}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={70}
-                      paddingAngle={4}
-                      dataKey="value"
-                      stroke="rgba(15, 23, 42, 0.95)"
-                      strokeWidth={2}
-                    >
-                      {pieDataAfter.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} style={{ outline: 'none' }} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomPieTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pie-center-label">
-                  <div className="pie-center-value" style={{ color: '#10b981' }}>{stats.humanScoreAfter}%</div>
-                  <div className="pie-center-desc">Human</div>
-                </div>
-              </div>
-            </div>
+          <div className="speedometers-container">
+            <Speedometer score={stats.aiScoreBefore} title="Original Draft" />
+            <Speedometer score={stats.aiScoreAfter} title="Humanized Output" />
           </div>
 
-          {/* Pie Chart Legend */}
-          <div className="chart-legend-custom">
-            <div className="legend-item">
-              <span className="legend-color-box" style={{ backgroundColor: '#10b981' }} />
-              <span>Human Elements</span>
-            </div>
+          <div className="chart-legend-custom" style={{ marginTop: '0.25rem' }}>
             <div className="legend-item">
               <span className="legend-color-box" style={{ backgroundColor: '#f43f5e' }} />
-              <span>AI Syntactic Markers</span>
+              <span>High Risk (&gt;60% AI likelihood)</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-color-box" style={{ backgroundColor: '#f59e0b' }} />
+              <span>Moderate Risk (30% - 60%)</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-color-box" style={{ backgroundColor: '#10b981' }} />
+              <span>Low Risk / Human Passed (&lt;30%)</span>
             </div>
           </div>
         </div>

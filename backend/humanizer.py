@@ -136,6 +136,7 @@ class FrenchHumanizer:
         max_retries: int = 5,
         backoff_factor: float = 2.0,
         progress_callback=None,
+        preset: Optional[str] = "balanced",
     ):
         """
         Initializes the FrenchHumanizer service.
@@ -149,6 +150,7 @@ class FrenchHumanizer:
             backoff_factor: Exponential growth factor for retry backoff.
             progress_callback: Optional callable(dict) invoked with progress
                 updates during multi-pass processing.
+            preset: The humanization style preset ('balanced', 'burstiness', 'academic', 'creative').
         """
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
@@ -162,6 +164,43 @@ class FrenchHumanizer:
         self.max_retries = max(0, max_retries)
         self.backoff_factor = backoff_factor
         self.progress_callback = progress_callback
+        self.preset = preset or "balanced"
+
+    def _get_pass_configs_for_preset(self) -> List[dict]:
+        preset_name = self.preset.lower()
+        
+        # Load standard config
+        config = dict(PASS_CONFIGS[0])
+        
+        if preset_name == "burstiness":
+            config["temperature"] = 1.15
+            config["system_prompt"] = config["system_prompt"] + (
+                "\n\nCONSIGNE COMPLÉMENTAIRE POUR LE PRESET 'VARIATION RYTHMIQUE EXTRÊME' (BURSTINESS MAJEURE) :\n"
+                "Accentuez au maximum les contrastes de longueur de phrase. Rédigez des phrases ultra-courtes de 2 à 5 mots "
+                "directement à côté de très longues phrases fluides de 35 à 50 mots avec des incises expressives (—). "
+                "Utilisez abondamment le point-virgule (;) pour fragmenter le rythme et casser tout schéma régulier."
+            )
+        elif preset_name == "academic":
+            config["temperature"] = 0.85
+            config["system_prompt"] = config["system_prompt"] + (
+                "\n\nCONSIGNE COMPLÉMENTAIRE POUR LE PRESET 'GARDE ACADÉMIQUE SOUTENUE' :\n"
+                "Rédigez dans un style universitaire et hautement professionnel. Utilisez un vocabulaire riche, précis "
+                "et particulièrement diversifié. Évitez absolument la grandiloquence artificielle générée par l'IA. "
+                "Bannissez toute construction passive ou impersonnelle pour privilégier des formulations actives, vivantes "
+                "et personnelles, tout en maintenant une rigueur d'analyse irréprochable."
+            )
+        elif preset_name == "creative":
+            config["temperature"] = 1.2
+            config["system_prompt"] = config["system_prompt"] + (
+                "\n\nCONSIGNE COMPLÉMENTAIRE POUR LE PRESET 'FLUX CRÉATIF ET LIBRE' :\n"
+                "Rédigez avec une liberté stylistique totale et une personnalité humaine très marquée. "
+                "Intégrez des questions rhétoriques percutantes, des exclamations naturelles, et des apartés spontanés "
+                "entre parenthèses. Utilisez des tournures orales élégantes ou des reformulations directes ('ou plutôt...', "
+                "'en fait...'). Le texte doit vibrer d'une voix humaine authentique et chaleureuse."
+            )
+            
+        return [config]
+
 
     # ------------------------------------------------------------------
     # Low-level API helpers
@@ -482,7 +521,8 @@ class FrenchHumanizer:
 
         current_paragraphs = list(paragraphs)
 
-        for pass_number, pass_config in enumerate(PASS_CONFIGS, start=1):
+        configs = self._get_pass_configs_for_preset()
+        for pass_number, pass_config in enumerate(configs, start=1):
             current_paragraphs = await self._run_single_pass(
                 current_paragraphs, pass_config, pass_number
             )
