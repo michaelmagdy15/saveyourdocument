@@ -1,0 +1,965 @@
+/*
+ * FRONTEND CORE STYLESHEET - Modern Dark-Mode Design System
+ * 
+ * This is a highly polished, custom, utility-first design system crafted from scratch.
+ * It features HSL color theory, custom glassmorphism panels, glowing responsive interactions,
+ * fluid layout tools, and sleek micro-animations.
+ * No external CSS framework (like Tailwind or Bootstrap) is required!
+ */
+
+/* ==========================================================================
+   1. CORE CSS CUSTOM PROPERTIES (HSL Color Matrix)
+   ========================================================================== */
+:root {
+  /* --- Backgrounds (Deep Slate & Obsidian) --- */
+  --bg-base-hsl: 224, 25%, 5%;
+  --bg-surface-hsl: 224, 22%, 8%;
+  --bg-panel-hsl: 224, 20%, 12%;
+  --bg-panel-hover-hsl: 224, 18%, 15%;
+  
+  --bg-base: hsl(var(--bg-base-hsl));
+  --bg-surface: hsl(var(--bg-surface-hsl));
+  --bg-panel: hsl(var(--bg-panel-hsl));
+  --bg-panel-hover: hsl(var(--bg-panel-hover-hsl));
+
+  /* --- Brand Accents & Neon Vibrations --- */
+  --purple-accent-hsl: 270, 95%, 65%;
+  --emerald-accent-hsl: 152, 90%, 55%;
+  --cyan-accent-hsl: 190, 95%, 60%;
+  
+  --purple-accent: hsl(var(--purple-accent-hsl));
+  --purple-accent-glow: hsla(var(--purple-accent-hsl), 0.25);
+  --purple-accent-dim: hsla(var(--purple-accent-hsl), 0.12);
+  
+  --emerald-accent: hsl(var(--emerald-accent-hsl));
+  --emerald-accent-glow: hsla(var(--emerald-accent-hsl), 0.25);
+  --emerald-accent-dim: hsla(var(--emerald-accent-hsl), 0.12);
+  
+  --cyan-accent: hsl(var(--cyan-accent-hsl));
+  --cyan-accent-glow: hsla(var(--cyan-accent-hsl), 0.25);
+  --cyan-accent-dim: hsla(var(--cyan-accent-hsl), 0.12);
+
+  /* --- Soft Borders & Glass Outlines --- */
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-glass-bright: rgba(255, 255, 255, 0.15);
+  --border-purple: hsla(var(--purple-accent-hsl), 0.3);
+  --border-emerald: hsla(var(--emerald-accent-hsl), 0.3);
+
+  /* --- Text Palette (Vivid White & Soft Grays) --- */
+  --text-vivid: hsl(0, 0%, 100%);
+  --text-primary: hsl(220, 15%, 90%);
+  --text-secondary: hsl(220, 12%, 70%);
+  --text-muted: hsl(220, 8%, 48%);
+  --text-purple: hsl(270, 100%, 80%);
+  --text-emerald: hsl(152, 100%, 75%);
+
+  /* --- Shadows & Glow Maps --- */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  
+  --glow-purple: 0 0 15px hsla(var(--purple-accent-hsl), 0.35);
+  --glow-emerald: 0 0 15px hsla(var(--emerald-accent-hsl), 0.35);
+  --glow-cyan: 0 0 15px hsla(var(--cyan-accent-hsl), 0.35);
+
+  /* --- Feedback Colors --- */
+  --color-success: hsl(145, 80%, 48%);
+  --color-warning: hsl(38, 95%, 55%);
+  --color-error: hsl(355, 85%, 60%);
+
+  /* --- Border Radius System --- */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  /* --- Transition Settings --- */
+  --transition-speed-fast: 150ms;
+  --transition-speed-normal: 250ms;
+  --transition-speed-slow: 400ms;
+  --easing-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-all: all var(--transition-speed-normal) var(--easing-smooth);
+}
+
+/* ==========================================================================
+   2. GLOBAL RESET & BASE STYLES
+   ========================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-panel-hover);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--purple-accent);
+}
+
+/* Custom Selection Highlight */
+::selection {
+  background: hsla(var(--purple-accent-hsl), 0.3);
+  color: var(--text-vivid);
+}
+
+/* Typography Helpers */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-vivid);
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 0.5em;
+  letter-spacing: -0.02em;
+}
+
+h1 { font-size: 2.5rem; }
+h2 { font-size: 2rem; }
+h3 { font-size: 1.5rem; }
+h4 { font-size: 1.25rem; }
+
+p {
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+}
+
+a {
+  color: var(--purple-accent);
+  text-decoration: none;
+  transition: var(--transition-all);
+}
+
+a:hover {
+  color: var(--text-vivid);
+  text-shadow: 0 0 8px hsla(var(--purple-accent-hsl), 0.4);
+}
+
+/* Image styling */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ==========================================================================
+   3. PREMIUM GLASSMORPHISM UTILITY CLASSES
+   ========================================================================== */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-glass);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+.glass-panel-heavy {
+  background: rgba(10, 15, 30, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glass-bright);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-lg);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-glass);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  transition: var(--transition-all);
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.08);
+}
+
+/* Glassmorphism Accents */
+.glass-card-purple {
+  background: hsla(var(--purple-accent-hsl), 0.03);
+  border: 1px solid var(--border-purple);
+  box-shadow: 0 4px 20px rgba(120, 0, 255, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.glass-card-purple:hover {
+  background: hsla(var(--purple-accent-hsl), 0.06);
+  border-color: var(--purple-accent);
+  box-shadow: 0 8px 30px rgba(120, 0, 255, 0.15), var(--glow-purple), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+.glass-card-emerald {
+  background: hsla(var(--emerald-accent-hsl), 0.02);
+  border: 1px solid var(--border-emerald);
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.glass-card-emerald:hover {
+  background: hsla(var(--emerald-accent-hsl), 0.05);
+  border-color: var(--emerald-accent);
+  box-shadow: 0 8px 30px rgba(16, 185, 129, 0.15), var(--glow-emerald), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Premium glass navbar helper */
+.glass-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 15, 30, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-glass);
+}
+
+/* ==========================================================================
+   4. FLUID BUTTON STYLES & INTERACTIVE STATES
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: var(--transition-all);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Prevent accidental clicking when executing operations */
+.btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Solid Purple Accent Button */
+.btn-primary {
+  background: var(--purple-accent);
+  color: var(--text-vivid);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  background: hsl(270, 95%, 72%);
+  box-shadow: var(--glow-purple), 0 4px 15px rgba(0,0,0,0.4);
+}
+
+/* Solid Emerald Accent Button */
+.btn-success {
+  background: var(--emerald-accent);
+  color: var(--bg-base);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-success:hover {
+  background: hsl(152, 90%, 62%);
+  box-shadow: var(--glow-emerald), 0 4px 15px rgba(0,0,0,0.4);
+}
+
+/* Modern Outline/Glass Button */
+.btn-outline {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--border-glass-bright);
+  color: var(--text-primary);
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--text-vivid);
+  color: var(--text-vivid);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Glow Outline Purple */
+.btn-outline-purple {
+  background: transparent;
+  border-color: var(--border-purple);
+  color: var(--text-purple);
+}
+
+.btn-outline-purple:hover {
+  background: var(--purple-accent-dim);
+  border-color: var(--purple-accent);
+  color: var(--text-vivid);
+  box-shadow: var(--glow-purple);
+}
+
+/* Glow Outline Emerald */
+.btn-outline-emerald {
+  background: transparent;
+  border-color: var(--border-emerald);
+  color: var(--text-emerald);
+}
+
+.btn-outline-emerald:hover {
+  background: var(--emerald-accent-dim);
+  border-color: var(--emerald-accent);
+  color: var(--text-vivid);
+  box-shadow: var(--glow-emerald);
+}
+
+/* Small, Medium, Large sizes */
+.btn-sm {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn-lg {
+  padding: 1rem 2.25rem;
+  font-size: 1.1rem;
+  border-radius: var(--radius-lg);
+}
+
+/* Full Width Button */
+.btn-block {
+  width: 100%;
+}
+
+/* Disabled State */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Modern Hover Ripple Layer Setup */
+.btn::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120%;
+  height: 0;
+  padding-bottom: 120%;
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  transition: opacity 0.6s, transform 0.6s;
+  pointer-events: none;
+}
+
+.btn:active::after {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(0);
+  transition: 0s;
+}
+
+/* ==========================================================================
+   5. INPUT FOCUS GLOW EFFECTS & FORM ELEMENTS
+   ========================================================================== */
+.form-group {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.form-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  background: rgba(10, 15, 30, 0.4);
+  border: 1px solid var(--border-glass-bright);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  outline: none;
+  transition: var(--transition-all);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Soft Emerald Glow Focus for Success fields */
+.form-input-emerald:focus {
+  border-color: var(--emerald-accent);
+  background: rgba(10, 15, 30, 0.6);
+  box-shadow: 0 0 0 1px var(--emerald-accent), var(--glow-emerald);
+}
+
+/* default Focus: Vibrant Purple Glow */
+.form-input:focus {
+  border-color: var(--purple-accent);
+  background: rgba(10, 15, 30, 0.6);
+  box-shadow: 0 0 0 1px var(--purple-accent), var(--glow-purple);
+}
+
+/* Textarea customization */
+textarea.form-input {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Checkbox and radio premium custom containers */
+.control-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  padding: 0.25rem 0;
+  transition: var(--transition-all);
+}
+
+.control-container:hover {
+  color: var(--text-vivid);
+}
+
+.control-input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-glass-bright);
+  border-radius: var(--radius-xs);
+  background: rgba(10, 15, 30, 0.4);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  position: relative;
+  transition: var(--transition-all);
+}
+
+.control-input::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  transform: scale(0);
+  background-color: var(--purple-accent);
+  border-radius: 2px;
+  transition: 120ms transform ease-in-out;
+  box-shadow: var(--glow-purple);
+}
+
+.control-input:checked {
+  border-color: var(--purple-accent);
+  box-shadow: var(--glow-purple);
+}
+
+.control-input:checked::before {
+  transform: scale(1);
+}
+
+/* Radio Specific Circle styles */
+.control-input-radio {
+  border-radius: var(--radius-full);
+}
+.control-input-radio::before {
+  border-radius: var(--radius-full);
+}
+
+/* Premium toggle switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: .4s;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-glass);
+}
+
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--text-primary);
+  transition: .3s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--radius-full);
+}
+
+input:checked + .slider {
+  background-color: var(--purple-accent-dim);
+  border-color: var(--purple-accent);
+}
+
+input:checked + .slider::before {
+  transform: translateX(24px);
+  background-color: var(--purple-accent);
+  box-shadow: var(--glow-purple);
+}
+
+/* ==========================================================================
+   6. RESPONSIVE GRID SYSTEMS & CONTAINER LAYOUTS
+   ========================================================================== */
+.container {
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: 1.5rem;
+  padding-left: 1.5rem;
+}
+
+/* Media breakpoints container widths */
+@media (min-width: 576px) { .container { max-width: 540px; } }
+@media (min-width: 768px) { .container { max-width: 720px; } }
+@media (min-width: 992px) { .container { max-width: 960px; } }
+@media (min-width: 1200px) { .container { max-width: 1140px; } }
+@media (min-width: 1400px) { .container { max-width: 1320px; } }
+
+.container-fluid {
+  width: 100%;
+  padding-right: 1.5rem;
+  padding-left: 1.5rem;
+}
+
+/* Flexible Layout Helpers */
+.flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.align-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.gap-sm { gap: 0.5rem; }
+.gap-md { gap: 1rem; }
+.gap-lg { gap: 1.5rem; }
+.gap-xl { gap: 2.5rem; }
+
+/* Responsive Grid Systems */
+.grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (max-width: 992px) {
+  .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 576px) {
+  .grid-cols-4 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+  .grid-cols-3 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+  .grid-cols-2 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+}
+
+/* Elegant Fluid Autofit grid that handles resizing perfectly without media queries */
+.grid-autofit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Margins & Paddings Helpers */
+.py-sm { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.py-md { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.py-lg { padding-top: 3rem; padding-bottom: 3rem; }
+.py-xl { padding-top: 5rem; padding-bottom: 5rem; }
+
+.px-sm { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-md { padding-left: 1.5rem; padding-right: 1.5rem; }
+.px-lg { padding-left: 3rem; padding-right: 3rem; }
+
+.my-sm { margin-top: 0.5rem; margin-bottom: 0.5rem; }
+.my-md { margin-top: 1.5rem; margin-bottom: 1.5rem; }
+.my-lg { margin-top: 3rem; margin-bottom: 3rem; }
+
+/* ==========================================================================
+   7. CUSTOM ANIMATIONS & TRANSLATION STATES
+   ========================================================================== */
+
+/* A. Infinite Rotation - Perfect for rotating upload/sync/syncing icons */
+@keyframes spin-clockwise {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-clockwise 8s linear infinite;
+}
+
+.animate-spin-fast {
+  animation: spin-clockwise 1.2s linear infinite;
+}
+
+/* Beautiful hover action that rotates an icon on active states */
+.hover-rotate-icon:hover .rotate-target {
+  transform: rotate(180deg);
+}
+.rotate-target {
+  transition: transform var(--transition-speed-normal) var(--easing-smooth);
+}
+
+/* B. Pulse Glow - Perfect for active indicator dots or flashing states */
+@keyframes pulse-glow-purple {
+  0% {
+    box-shadow: 0 0 0 0 hsla(var(--purple-accent-hsl), 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 8px hsla(var(--purple-accent-hsl), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsla(var(--purple-accent-hsl), 0);
+  }
+}
+
+@keyframes pulse-glow-emerald {
+  0% {
+    box-shadow: 0 0 0 0 hsla(var(--emerald-accent-hsl), 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 8px hsla(var(--emerald-accent-hsl), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsla(var(--emerald-accent-hsl), 0);
+  }
+}
+
+.status-dot-purple {
+  width: 8px;
+  height: 8px;
+  background-color: var(--purple-accent);
+  border-radius: var(--radius-full);
+  display: inline-block;
+  box-shadow: var(--glow-purple);
+  animation: pulse-glow-purple 2s infinite;
+}
+
+.status-dot-emerald {
+  width: 8px;
+  height: 8px;
+  background-color: var(--emerald-accent);
+  border-radius: var(--radius-full);
+  display: inline-block;
+  box-shadow: var(--glow-emerald);
+  animation: pulse-glow-emerald 2s infinite;
+}
+
+/* C. Shimmer Effect - Elegant skeletal placeholders */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.03) 25%, 
+    rgba(255, 255, 255, 0.08) 37%, 
+    rgba(255, 255, 255, 0.03) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.8s infinite ease-in-out;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+  height: 1.25em;
+  width: 100%;
+}
+
+/* D. Float Animation - Subtle visual lifting */
+@keyframes gentle-float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-float {
+  animation: gentle-float 5s ease-in-out infinite;
+}
+
+/* E. Fade and Slide Up - Loading cards gracefully */
+@keyframes fade-slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-slide-up var(--transition-speed-slow) var(--easing-smooth) forwards;
+}
+
+/* ==========================================================================
+   8. COMPONENT SPECIFIC POLISH (Card, Badge, Alert, Tooltip)
+   ========================================================================== */
+
+/* Modern Neon Border Glowing Card */
+.neon-glow-card {
+  position: relative;
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  padding: 2rem;
+  overflow: hidden;
+}
+
+.neon-glow-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--purple-accent), var(--cyan-accent), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s var(--easing-smooth);
+}
+
+.neon-glow-card:hover::before {
+  transform: translateX(100%);
+}
+
+/* Custom premium badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+}
+
+.badge-purple {
+  background: var(--purple-accent-dim);
+  color: var(--text-purple);
+  border-color: var(--border-purple);
+}
+
+.badge-emerald {
+  background: var(--emerald-accent-dim);
+  color: var(--text-emerald);
+  border-color: var(--border-emerald);
+}
+
+.badge-gray {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border-color: var(--border-glass);
+}
+
+/* Custom Alert Banner */
+.alert {
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  border-left: 4px solid transparent;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(8px);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.alert-success {
+  border-left-color: var(--color-success);
+  border-right: 1px solid rgba(16, 185, 129, 0.1);
+  border-top: 1px solid rgba(16, 185, 129, 0.1);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+  color: hsl(145, 80%, 90%);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.alert-warning {
+  border-left-color: var(--color-warning);
+  border-right: 1px solid rgba(245, 158, 11, 0.1);
+  border-top: 1px solid rgba(245, 158, 11, 0.1);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.1);
+  color: hsl(38, 95%, 90%);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.alert-error {
+  border-left-color: var(--color-error);
+  border-right: 1px solid rgba(239, 68, 68, 0.1);
+  border-top: 1px solid rgba(239, 68, 68, 0.1);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.1);
+  color: hsl(355, 85%, 90%);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+/* Animated Upload Zone Drop Box */
+.upload-zone {
+  border: 2px dashed var(--border-glass-bright);
+  border-radius: var(--radius-lg);
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.01);
+  transition: var(--transition-all);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.upload-zone:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--purple-accent);
+  box-shadow: inset 0 0 20px rgba(120, 0, 255, 0.05);
+}
+
+.upload-zone:hover .upload-icon {
+  transform: translateY(-5px);
+  color: var(--purple-accent);
+  filter: drop-shadow(0 0 8px hsla(var(--purple-accent-hsl), 0.5));
+}
+
+.upload-icon {
+  font-size: 2.5rem;
+  color: var(--text-muted);
+  transition: var(--transition-all);
+}
+
+/* High Fidelity Interactive Overlay / Backdrop */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(5, 8, 20, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: grid;
+  place-content: center;
+  z-index: 1000;
+  animation: fade-slide-up 0.3s var(--easing-smooth) forwards;
+}
+
+/* ==========================================================================
+   9. PREMIUM VISUAL HIGHLIGHTS / GLOW EFFECTS
+   ========================================================================== */
+.glow-text-purple {
+  color: var(--text-purple);
+  text-shadow: var(--glow-purple);
+}
+
+.glow-text-emerald {
+  color: var(--text-emerald);
+  text-shadow: var(--glow-emerald);
+}
+
+.glowing-mesh-background {
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 120%;
+  height: 120%;
+  pointer-events: none;
+  z-index: -1;
+  background: 
+    radial-gradient(circle at 20% 30%, hsla(var(--purple-accent-hsl), 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, hsla(var(--cyan-accent-hsl), 0.08) 0%, transparent 40%);
+  opacity: 0.8;
+  filter: blur(60px);
+}

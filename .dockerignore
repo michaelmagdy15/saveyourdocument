@@ -1,0 +1,48 @@
+# Dependencies & build artifacts
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Environment & secrets
+.env
+.env.*
+!.env.template
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+Thumbs.db
+.DS_Store
+~$*
+
+# Temp files
+backend/temp_uploads/
+*.log
+*.tmp
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# PowerShell runners (dev only)
+*.ps1
+
+# Tests (not needed in production)
+tests/
+
+# Documentation
+*.md
+LICENSE

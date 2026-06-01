@@ -1,0 +1,358 @@
+/* TextPreview.css - Premium side-by-side layout & visual diffing with high-legibility styling */
+
+.diff-viewer-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 2.25rem;
+  box-sizing: border-box;
+  text-align: left;
+  width: 100%;
+}
+
+.diff-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-glass);
+  padding-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.diff-viewer-title h3 {
+  font-size: 1.35rem;
+  color: var(--text-vivid);
+  margin: 0;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  letter-spacing: -0.015em;
+}
+
+.diff-viewer-title p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0.35rem 0 0;
+}
+
+.diff-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* View switcher tabs */
+.diff-view-selector {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.35rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-all);
+}
+
+.diff-view-btn {
+  font-family: inherit;
+  font-size: 0.825rem;
+  padding: 0.5rem 1.125rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-all);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  user-select: none;
+}
+
+/* Tab button hover glow */
+.diff-view-btn:hover:not(.active) {
+  color: var(--text-vivid);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+}
+
+/* Tab button active state with elegant glow and border */
+.diff-view-btn.active {
+  background: hsla(var(--purple-accent-hsl), 0.1);
+  color: var(--text-purple);
+  border-color: var(--border-purple);
+  box-shadow: var(--glow-purple);
+  font-weight: 700;
+}
+
+/* Emerald Accent Copy Button */
+.diff-copy-btn {
+  font-family: inherit;
+  font-size: 0.825rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-emerald);
+  background: hsla(var(--emerald-accent-hsl), 0.08);
+  color: var(--text-emerald);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-all);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.diff-copy-btn:hover {
+  background: var(--emerald-accent);
+  color: var(--bg-surface);
+  border-color: var(--emerald-accent);
+  box-shadow: var(--glow-emerald);
+}
+
+/* Side-by-side grid */
+.diff-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.diff-labels-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem; /* Perfect matching alignment gap */
+  padding: 0.5rem 1.5rem;
+  border-bottom: 1px dashed var(--border-glass);
+}
+
+@media (max-width: 768px) {
+  .diff-labels-row {
+    display: none; /* Hide labels row on mobile */
+  }
+}
+
+.diff-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem; /* Perfect matching column gap */
+  padding: 1.75rem;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  transition: var(--transition-all);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Symmetrical Hover Highlights */
+.diff-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: var(--shadow-md), 0 0 15px rgba(255, 255, 255, 0.01);
+}
+
+/* Symmetrical Vertical Divider */
+.diff-row::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 1.75rem;
+  bottom: 1.75rem;
+  width: 1px;
+  background: var(--border-glass-bright);
+  opacity: 0.35;
+  transform: translateX(-50%);
+}
+
+.diff-column {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Desktop: hide mobile-only badge inside the columns */
+.diff-column .diff-col-badge {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .diff-row {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+    padding: 1.5rem;
+  }
+  
+  .diff-row::after {
+    display: none; /* Hide vertical divider on mobile stacked view */
+  }
+
+  /* Mobile: show badges on top of their respective columns */
+  .diff-column .diff-col-badge {
+    display: inline-flex;
+    margin-bottom: 1rem;
+    align-self: flex-start;
+  }
+}
+
+/* Typography styles for content columns */
+.diff-column p,
+.unified-paragraph p,
+.clean-paragraph p {
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.8;
+  letter-spacing: 0.015em;
+  color: var(--text-primary);
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Premium Word diffing highlights with high legibility & display: inline wrapping */
+.word-deleted {
+  background-color: rgba(244, 63, 94, 0.14); /* soft rose red tint */
+  color: #f43f5e; /* vivid legible rose red */
+  text-decoration: line-through;
+  text-decoration-color: rgba(244, 63, 94, 0.55);
+  text-decoration-thickness: 1.5px;
+  padding: 0.15rem 0.25rem;
+  border-radius: 4px;
+  margin: 0 0.04em;
+  font-weight: 550;
+  display: inline;
+}
+
+.word-added {
+  background-color: rgba(16, 185, 129, 0.12); /* soft emerald green tint */
+  color: #10b981; /* highly-legible emerald */
+  border-bottom: 2px solid rgba(16, 185, 129, 0.8); /* soft underline */
+  padding: 0.15rem 0.25rem;
+  border-radius: 4px;
+  margin: 0 0.04em;
+  font-weight: 550;
+  display: inline;
+}
+
+.word-normal {
+  display: inline;
+}
+
+/* Unified Inline Diff View */
+.unified-diff-container {
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 1.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-glass);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.unified-paragraph {
+  padding: 1.25rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-glass);
+  transition: var(--transition-all);
+}
+
+.unified-paragraph:hover {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Clean Final View */
+.clean-view-container {
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 1.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-glass);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.clean-paragraph {
+  padding: 0.5rem 0;
+}
+
+/* Premium Glowing badges for AI and Humanized columns */
+.diff-col-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.375rem 0.875rem;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: var(--transition-all);
+  cursor: default;
+  user-select: none;
+}
+
+.diff-col-badge.original {
+  background: rgba(239, 68, 68, 0.06);
+  color: #f43f5e;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.12), inset 0 0 4px rgba(239, 68, 68, 0.05);
+}
+
+.diff-col-badge.original:hover {
+  border-color: rgba(239, 68, 68, 0.65);
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.25), inset 0 0 6px rgba(239, 68, 68, 0.15);
+}
+
+.diff-col-badge.humanized {
+  background: rgba(16, 185, 129, 0.06);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.15), inset 0 0 4px rgba(16, 185, 129, 0.05);
+}
+
+.diff-col-badge.humanized:hover {
+  border-color: rgba(16, 185, 129, 0.65);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.3), inset 0 0 6px rgba(16, 185, 129, 0.15);
+}
+
+/* Elegant copy notification toast with glowing emerald auras */
+.copy-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: var(--emerald-accent);
+  color: var(--bg-surface);
+  padding: 0.875rem 1.5rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg), var(--glow-emerald);
+  font-size: 0.9rem;
+  font-weight: 700;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  animation: slideUpFade 0.4s var(--easing-smooth) forwards;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

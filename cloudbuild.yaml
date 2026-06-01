@@ -1,0 +1,78 @@
+# =====================================================
+# SAVEYOURDOCUMENT - Google Cloud Build Configuration
+# Builds Docker image and deploys to Cloud Run
+# By Mitrixo Systems
+# =====================================================
+#
+# SETUP INSTRUCTIONS:
+#   1. Install Google Cloud SDK: https://cloud.google.com/sdk/docs/install
+#   2. Authenticate: gcloud auth login
+#   3. Set project: gcloud config set project YOUR_PROJECT_ID
+#   4. Enable APIs: gcloud services enable cloudbuild.googleapis.com run.googleapis.com artifactregistry.googleapis.com
+#   5. Create Artifact Registry repo:
+#      gcloud artifacts repositories create saveyourdocument --repository-format=docker --location=us-central1
+#   6. Deploy: gcloud builds submit --config=cloudbuild.yaml .
+#
+# ENVIRONMENT VARIABLES:
+#   Set GEMINI_API_KEY in Cloud Run:
+#   gcloud run services update saveyourdocument --set-env-vars="GEMINI_API_KEY=your-key-here" --region=us-central1
+
+substitutions:
+  _SERVICE_NAME: saveyourdocument
+  _REGION: us-central1
+  _REPO: saveyourdocument
+
+steps:
+  # Step 1: Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:latest'
+      - '.'
+
+  # Step 2: Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}'
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300'
+      - '--concurrency'
+      - '80'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+      - '--set-env-vars'
+      - 'PYTHONDONTWRITEBYTECODE=1,PYTHONUNBUFFERED=1'
+
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:$COMMIT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:latest'
+
+timeout: '1200s'
+options:
+  logging: CLOUD_LOGGING_ONLY
